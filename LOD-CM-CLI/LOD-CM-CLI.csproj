@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <RootNamespace>LOD_CM_CLI</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Accord.MachineLearning" Version="3.8.2-alpha" />
+    <PackageReference Include="dotNetRDF" Version="2.2.0-pre0001" />
+    <PackageReference Include="HDTDotnet" Version="0.0.1-alpha" />
+    <PackageReference Include="iTernity.plantuml" Version="1.1.0" />
+    <!-- <PackageReference Include="NPlant.API" Version="0.1.56" /> -->
+  </ItemGroup>
+  
+
+</Project>

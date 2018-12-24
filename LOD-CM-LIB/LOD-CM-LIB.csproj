@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netcoreapp2.2</TargetFrameworks>
+    <RootNamespace>LOD_CM_LIB</RootNamespace>
+  </PropertyGroup>
+
+</Project>
