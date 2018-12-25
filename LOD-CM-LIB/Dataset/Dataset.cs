@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using HDTDotnet;
+using VDS.RDF;
 using VDS.RDF.Ontology;
+using VDS.RDF.Parsing;
 
 namespace LOD_CM_CLI.Data
 {
@@ -16,17 +19,41 @@ namespace LOD_CM_CLI.Data
         /// If true, then the HDT file has been opened and loaded in memory.
         /// </summary>
         /// <value></value>
-        public bool IsOpen {get; private set;}
+        public bool IsOpen { get; private set; }
 
         private HDT hdt;
-        public string hdtFilePath {get;set;}
+        public string hdtFilePath { get; set; }
+        public string ontologyFilePath { get; set; }
+        public bool IsOntologyAvailable { get; private set; }
 
-        private Dataset(string hdtFilePath)
+        public string Label { get; set; }
+
+        private IGraph _ontology;
+        public IGraph ontology
+        {
+            get
+            {
+                if (_ontology == null)
+                {
+                    _ontology = new Graph();
+                    FileLoader.Load(_ontology, Path.Combine(ontologyFilePath));
+                }
+                return _ontology;
+            }
+        }
+
+        private Dataset(string hdtFilePath, string ontologyFilePath)
         {
             IsOpen = false;
             this.hdtFilePath = hdtFilePath;
+            if (!File.Exists(hdtFilePath))
+                throw new FileNotFoundException("You must provide an existing HDT file path!", hdtFilePath);
+            this.ontologyFilePath = ontologyFilePath;
+            // we just check if an ontology file is provided
+            this.IsOntologyAvailable = ontologyFilePath != null &&
+                File.Exists(ontologyFilePath);
         }
-        
+
         /// <summary>
         /// Get instances of the given class
         /// </summary>
@@ -52,7 +79,7 @@ namespace LOD_CM_CLI.Data
         }
 
         public async Task<HashSet<string>> GetSubjects(string predicate, string obj)
-        {            
+        {
             if (!IsOpen) await LoadHdt();
             return hdt.search("", predicate, obj)
                 .Select(x => x.getSubject()).ToHashSet();
@@ -65,8 +92,9 @@ namespace LOD_CM_CLI.Data
                 .Select(x => x.getObject()).ToHashSet();
         }
 
-        public static Dataset Create(string hdtFilePath) {
-            return new Dataset(hdtFilePath);
+        public static Dataset Create(string hdtFilePath, string ontologyFilePath)
+        {
+            return new Dataset(hdtFilePath, ontologyFilePath);
         }
 
         /// <summary>
@@ -100,13 +128,17 @@ namespace LOD_CM_CLI.Data
         public async Task<IEnumerable<InstanceClass>> GetInstanceClasses()
         {
             if (!IsOpen) await LoadHdt();
+            // check if we have an ontology. If yes use it ! If not, use HDT
+            if (IsOntologyAvailable)
+            {
+                var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
+                var owlClass = ontology.GetUriNode(new Uri(OntologyHelper.OwlClass));
+                return ontology.GetTriplesWithPredicateObject(rdfType, owlClass)
+                    .Select(x => new InstanceClass(x.Subject.ToString()));
+            }
             var classUris = hdt.search("", OntologyHelper.PropertyType, "")
                 .Select(x => x.getObject()).ToHashSet();
-            return classUris.Select(x => new InstanceClass
-            {
-                Uri = x,
-                Label = x.Substring(x.LastIndexOf("/") + 1)
-            });
+            return classUris.Select(x => new InstanceClass(x));
         }
     }
 }

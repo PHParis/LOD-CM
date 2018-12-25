@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Accord.MachineLearning.Rules;
 using PatternDiscovery;
 using PatternDiscovery.FrequentPatterns;
@@ -21,7 +23,7 @@ namespace LOD_CM_CLI.Mining
 
         public void GetFrequentPattern(T[][] transactions, double threshold)
         {
-            if (threshold > 1) 
+            if (threshold > 1)
                 throw new ArgumentException("Threshold must be between 0 and 1");
             // t = s / tlength;
             // t * tlengh = s;
@@ -48,14 +50,54 @@ namespace LOD_CM_CLI.Mining
             //     Console.WriteLine(rule);
             // }
         }
+        
+        /// <summary>
+        /// Return true if the FP is contained in the set (i.e.
+        /// if it has already been computed).
+        /// </summary>
+        /// <param name="set"></param>
+        /// <param name="currentFP"></param>
+        /// <returns></returns>
+        public static (bool, FrequentPattern<T>) Contained(List<FrequentPattern<T>> set, FrequentPattern<T> currentFP)
+        {
+            if (!set.Any()) return (false, null);
+            var setOfSet = currentFP.fis.Select(x => x.ToHashSet()).ToHashSet();
+            // var oldFP = set.Select(x =>
+            // {
+            //     var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
+            //     return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y))) ?
+            //         currentFP : null;
+            // }).FirstOrDefault();
+            // // var res = set.Any(x =>
+            // // {
+            // //     var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
+            // //     return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y)));
+            // // });
+            var oldFP = set.FirstOrDefault(x =>
+            {
+                var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
+                return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y)));
+            });
+            return (oldFP != null, oldFP);  
+        }
+
+        public async Task SaveFP(string fpFilePath)
+        {
+            await File.WriteAllLinesAsync(fpFilePath,
+                fis.Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
+            );
+        }
+
+        public double minSupport { get; private set; }
 
         public PatternDiscovery.ItemSets<T> GetFrequentPatternV2(
-            List<PatternDiscovery.Transaction<T>> transactions, 
+            List<PatternDiscovery.Transaction<T>> transactions,
             double minSupport,
             List<T> domain)
         {
-            if (minSupport > 1) 
+            if (minSupport > 1)
                 throw new ArgumentException("Threshold must be between 0 and 1");
+            this.minSupport = minSupport;
             // t = s / tlength;
             // t * tlengh = s;
             // var support = (int)Math.Floor(threshold * transactions.Count);
@@ -75,7 +117,7 @@ namespace LOD_CM_CLI.Mining
             //     Console.WriteLine(string.Join(" ", fis[i]) + " #SUP: " + fis[i].TransactionCount
             //         + " " + IsMFPV2(fis[i].ToHashSet(), fisSet));
             // }
-            
+
             // Console.WriteLine("Maximum");
             // foreach (var rule in GetMFPV2(fisSet))
             // {

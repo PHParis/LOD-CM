@@ -10,6 +10,8 @@ using VDS.RDF.Parsing;
 using VDS.RDF.Query;
 using System.Threading.Tasks;
 using System.Text;
+using Iternity.PlantUML;
+using System.Net.Http;
 
 namespace LOD_CM_CLI.Uml
 {
@@ -25,28 +27,54 @@ namespace LOD_CM_CLI.Uml
         public Dictionary<int, string> propertyMinsup;// = new Dictionary<int, string>();
 
         // public static Dictionary<int, string> HashmapItem = new Dictionary<int, string>();
+        /// <summary>
+        /// Content sended to PlantUML for image generation
+        /// </summary>
+        /// <value></value>
+        public string contentForUml { get; private set; }
+        /// <summary>
+        /// Content of the SVG file retrieved from PlantUML
+        /// </summary>
+        /// <value></value>
+        public string svgFileContent { get; private set; }
+        // private static IGraph _dbpOnt;
+        // public static IGraph dbpOnt
+        // {
+        //     get
+        //     {
+        //         if (_dbpOnt == null)
+        //         {
+        //             _dbpOnt = new Graph();
+        //             FileLoader.Load(_dbpOnt, Path.Combine(
+        //                 @"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples",
+        //                 "dbpedia_2016-10.nt")); // dbpedia_2016-10.nt
+        //                                         //dbpedia_2014.owl
+        //             Console.WriteLine("DBpedia onto loaded");
+        //         }
+        //         return _dbpOnt;
+        //     }
+        // }
 
-        private static IGraph _dbpOnt;
-        public static IGraph dbpOnt 
-        { 
-            get 
-            { 
-                if (_dbpOnt == null)
-                {
-                    _dbpOnt = new Graph();
-                    FileLoader.Load(_dbpOnt, Path.Combine(
-                        @"C:\dev\dotnet\LOD-CM-CLI\examples", 
-                        "dbpedia_2016-10.nt")); // dbpedia_2016-10.nt
-                        //dbpedia_2014.owl
-                    Console.WriteLine("DBpedia onto loaded");
-                }
-                return _dbpOnt; 
-            } 
+        public async Task GetImageContent()
+        {
+            var uri = PlantUMLUrl.SVG(contentForUml);
+            using (var client = new HttpClient())
+            {
+                svgFileContent = await client.GetStringAsync(uri);
+            }
         }
 
         // public static Uri RDFType = new Uri("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+        public async Task SaveImage(string filePath)
+        {
+            await File.WriteAllTextAsync(filePath, svgFileContent);
+        }
+        public async Task SaveContentForPlantUML(string filePath)
+        {
+            await File.WriteAllTextAsync(filePath, contentForUml);
+        }
 
-        public async Task<StringBuilder> GenerateTxtForUml(string type, double threshold,
+        public async Task<string> GenerateTxtForUml(string type, double threshold,
             int numberofTransactions, PatternDiscovery.ItemSets<int> mfps,
             Dictionary<int, string> HashmapItem, List<Tuple<HashSet<int>, double>> mfpsV2)
         {
@@ -103,19 +131,19 @@ namespace LOD_CM_CLI.Uml
                         propertyMinsup.Add(Convert.ToInt32(properties[0]), supp.ToString());
                 }
             }
-            
+
             // reader.close();
-            var rdfType = dbpOnt.GetUriNode(new Uri(OntologyHelper.PropertyType));
+            var rdfType = ds.ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
             foreach (int name in propertyMinsup.Keys)
             {
 
                 int key = name;
 
                 string property = HashmapItem[key];
-                var propertyNode = dbpOnt.GetUriNode(new Uri(property));
+                var propertyNode = ds.ontology.GetUriNode(new Uri(property));
                 if (propertyNode == null) continue;
                 bool NOObjectProperty = true;
-                var listTypes = dbpOnt.GetTriplesWithSubjectPredicate(
+                var listTypes = ds.ontology.GetTriplesWithSubjectPredicate(
                     propertyNode, rdfType).Select(x => x.Object as IUriNode)
                     .ToHashSet();
                 // HashSet<RDFNode> listTypes = dbpOnt.listStatements(ResourceFactory.createResource(property),
@@ -143,7 +171,7 @@ namespace LOD_CM_CLI.Uml
                 string dd = "";
                 string rr = "";
                 bool dash = false;
-                var domain = dbpOnt.Triples.Where(x => 
+                var domain = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(opp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyDomain))
                     .Select(x => x.Object.ToString())
@@ -151,8 +179,8 @@ namespace LOD_CM_CLI.Uml
                 // RDFNode domain = dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.domain) != null
                 //         ? dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.domain).getObject()
                 //         in null;
-                
-                var range = dbpOnt.Triples.Where(x => 
+
+                var range = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(opp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
@@ -207,8 +235,8 @@ namespace LOD_CM_CLI.Uml
             {
 
                 int cc = getKey(HashmapItem, dtp);
-                string vv = propertyMinsup.GetValueOrDefault(cc);                
-                var val = dbpOnt.Triples.Where(x => 
+                string vv = propertyMinsup.GetValueOrDefault(cc);
+                var val = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(dtp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
@@ -281,7 +309,8 @@ namespace LOD_CM_CLI.Uml
             }
 
             CModel.AppendLine("@enduml");
-            return CModel;
+            contentForUml = CModel.ToString();
+            return contentForUml;
             // Path fileCModel = Paths
             //         .get("/srv/www/htdocs/demo_conception/pictures_uml/CModel_" + type + "_" + threshold + ".txt");
             // Files.write(fileCModel, CModel, Charset.forName("UTF-8"));
@@ -340,7 +369,7 @@ namespace LOD_CM_CLI.Uml
             String superclass = "";
             String requete1 = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + c
                     + "> rdfs:subClassOf* ?superClass . " + " } ";
-            var results1 = (SparqlResultSet)dbpOnt.ExecuteQuery(requete1);
+            var results1 = (SparqlResultSet)ds.ontology.ExecuteQuery(requete1);
             foreach (var soln1 in results1)
             {
                 superclass = soln1["superClass"].ToString();
@@ -364,7 +393,7 @@ namespace LOD_CM_CLI.Uml
             String superclass = "";
             String requete1 = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + c
                     + "> rdfs:subClassOf ?superClass . " + " } ";
-            var results1 = (SparqlResultSet)dbpOnt.ExecuteQuery(requete1);
+            var results1 = (SparqlResultSet)ds.ontology.ExecuteQuery(requete1);
             foreach (var soln1 in results1)
             {
                 superclass = soln1["superClass"].ToString();
@@ -399,7 +428,7 @@ namespace LOD_CM_CLI.Uml
             var predicatesBySubject = subjectsTmp.AsParallel().Select(subject =>
             {
                 var setTmp = ds.GetObjects(subject, OntologyHelper.PropertyType).Result;
-                return new {subject, setTmp};
+                return new { subject, setTmp };
             }).ToDictionary(x => x.subject, x => x.setTmp);
             // subjectsTmp.parallelStream().forEach((subject)-> {
             //     IteratorTripleString iter = null;
@@ -426,7 +455,7 @@ namespace LOD_CM_CLI.Uml
             String ttt = "";
             foreach (var entry in predicatesBySubject)//.entrySet())
             {
-                var types = entry.Value.Where(x => x.Contains("dbpedia") && 
+                var types = entry.Value.Where(x => x.Contains("dbpedia") &&
                     !x.Contains("Wiki")).ToHashSet();
                 // Set<String> types = entry.getValue().stream().filter((t)->t.contains("dbpedia") && !t.contains("Wiki"))
                 //         .collect(Collectors.toSet());
@@ -453,10 +482,13 @@ namespace LOD_CM_CLI.Uml
             return ttt;
         }
 
-        public static HashSet<Object> getKeyFromValue(Dictionary<String, int> hm, Object value) {
+        public static HashSet<Object> getKeyFromValue(Dictionary<String, int> hm, Object value)
+        {
             var lo = new HashSet<Object>();
-            foreach (Object o in hm.Keys) {
-                if (hm.GetValueOrDefault(o.ToString()).Equals(value)) {
+            foreach (Object o in hm.Keys)
+            {
+                if (hm.GetValueOrDefault(o.ToString()).Equals(value))
+                {
                     lo.Add(o);
                 }
             }
@@ -478,7 +510,7 @@ namespace LOD_CM_CLI.Uml
             var predicatesBySubject = objectsTmp.AsParallel().Select(obj =>
             {
                 var setTmp = ds.GetObjects(obj, OntologyHelper.PropertyType).Result;
-                return new {subject= obj, setTmp};
+                return new { subject = obj, setTmp };
             }).ToDictionary(x => x.subject, x => x.setTmp);
             // objectsTmp.parallelStream().forEach((object) -> {
             //     IteratorTripleString iter = null;
@@ -506,7 +538,7 @@ namespace LOD_CM_CLI.Uml
             String ttt = "";
             foreach (var entry in predicatesBySubject)
             {
-                var types = entry.Value.Where(x => x.Contains("dbpedia") && 
+                var types = entry.Value.Where(x => x.Contains("dbpedia") &&
                     !x.Contains("Wiki")).ToHashSet();
                 // Set<String> types = entry.getValue().stream().filter((t)->t.contains("dbpedia") && !t.contains("Wiki"))
                 //         .collect(Collectors.toSet());

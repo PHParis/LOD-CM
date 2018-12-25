@@ -17,56 +17,110 @@ namespace LOD_CM_CLI
 {
     class Program
     {
-        const string WIKI_TYPE = "http://www.wikidata.org/prop/direct/P31";
-        const string RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+        // const string WIKI_TYPE = "http://www.wikidata.org/prop/direct/P31";
+        // const string RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 
         static async Task Main(string[] args)
         {
-            
+
             var sw = Stopwatch.StartNew();
-            using (var ds = await Dataset.Create(Path.Combine(
-                    @"E:\download", "dataset.hdt"
-                )).LoadHdt())
-            {  
-                await ComputeFpMfpImage(ds, new InstanceClass
-                {
-                    Uri = "http://dbpedia.org/ontology/Film",
-                    Label = "Film"
-                }, 0.51);
+            using (var ds = await Dataset.Create(
+                    Path.Combine(@"E:\download", "dataset.hdt"),
+                    Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt"))
+                .LoadHdt())//.LoadHdt() await
+            {
+                ds.Label = "DBpedia";
+                await ComputeFpMfpImage(ds, @"E:\download");
             }
             sw.Stop();
             Console.WriteLine(ToPrettyFormat(sw.Elapsed));
         }
 
-        public static async Task ComputeFpMfpImage(Dataset dataset, InstanceClass instanceClass, double threshold)
+        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
-            var transaction = await Transaction.GetTransactions(dataset, instanceClass);
-            
-            long baseId = 0;
-            var transactionBis = transaction.transactions.Select(x =>
-                new PatternDiscovery.Transaction<int>(x.ToArray())
-                {
-                    ID = baseId++
-                }
-            ).ToList();
-
-            var fp = new FrequentPattern<int>();
-            fp.GetFrequentPatternV2(transactionBis, threshold, transaction.domain);
-            var ig = new ImageGenerator(dataset);
-            var contentForUml = await ig.GenerateTxtForUml(instanceClass.Label, 
-                threshold, transaction.transactions.Count(), fp.fis, 
-                transaction.intToPredicateDict, null);
-            
-            var uri = PlantUMLUrl.SVG(contentForUml.ToString());
-            using (var client = new HttpClient())
+            // var ic = new InstanceClass
+            // {
+            //     Uri = "http://dbpedia.org/ontology/Film",
+            //     Label = "Film"
+            // };
+            Console.WriteLine("Getting classes...");
+            var classes = await dataset.GetInstanceClasses();
+            var total = classes.Count();
+            Console.WriteLine($"# classes: {total}");
+            Console.WriteLine("Looping on classes...");
+            var count = 1;
+            foreach (var instanceClass in classes)
             {
-                var svgFile = await client.GetStringAsync(uri);
-                await File.WriteAllTextAsync(Path.Combine(@"C:\Users\PH\Downloads",
-                $"test_{DateTime.Now.Ticks}.svg"), svgFile);
-                Console.WriteLine(svgFile);
+                Console.WriteLine($"class: {instanceClass.Label} ({count++}/{total})");
+                var transaction = await Transaction.GetTransactions(dataset, instanceClass);
+
+                long baseId = 0;
+                var transactionBis = transaction.transactions.Select(x =>
+                    new PatternDiscovery.Transaction<int>(x.ToArray())
+                    {
+                        ID = baseId++
+                    }
+                ).ToList();
+
+                // ex: ${workingdirectory}/DBpedia/Film
+                var instancePath = Path.Combine(
+                    mainDirectory,
+                    dataset.Label,
+                    instanceClass.Label
+                );
+                Directory.CreateDirectory(instancePath);
+                await transaction.SaveToFiles(
+                    Path.Combine(instancePath, "transactions.txt"),
+                    Path.Combine(instancePath, "dictionary.txt")
+                );
+
+                var fpSet = new List<FrequentPattern<int>>();
+
+                foreach (var thresholdInt in Enumerable.Range(1, 100))
+                {
+                    var threshold = thresholdInt / 100d;
+
+                    var fp = new FrequentPattern<int>();
+                    fp.GetFrequentPatternV2(transactionBis, threshold, transaction.domain);
+
+                    var imageFilePath = Path.Combine(
+                        instancePath,
+                        thresholdInt.ToString());
+                    Directory.CreateDirectory(imageFilePath);
+                    var (alreadyProcessed, previousFP) = FrequentPattern<int>.Contained(fpSet, fp);
+                    if (alreadyProcessed)
+                    {
+                        // fp are the same than in a previous computation
+                        // We don't need to get image, just to copy it!
+                        var previousThreshold = previousFP.minSupport;
+                        var previousImageFilePath = Path.Combine(
+                            instancePath,
+                            (Convert.ToInt32(previousThreshold * 100)).ToString());
+                        File.Copy(Path.Combine(previousImageFilePath, "fp.txt"), Path.Combine(imageFilePath, "fp.txt"));
+                        File.Copy(Path.Combine(previousImageFilePath, "plant.txt"), Path.Combine(imageFilePath, "plant.txt"));
+                        File.Copy(Path.Combine(previousImageFilePath, "img.svg"), Path.Combine(imageFilePath, "img.svg"));
+                    }
+                    else
+                    {
+                        fpSet.Add(fp);
+                        var ig = new ImageGenerator(dataset);
+                        var contentForUml = await ig.GenerateTxtForUml(instanceClass.Label,
+                            threshold, transaction.transactions.Count(), fp.fis,
+                            transaction.intToPredicateDict, null);
+
+                        await ig.GetImageContent();
+                        await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
+                        await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, "plant.txt"));
+                        await ig.SaveImage(Path.Combine(imageFilePath, "img.svg"));
+                    }
+                }
+
             }
+
+
         }
-        public static string ToPrettyFormat(TimeSpan span) {
+        public static string ToPrettyFormat(TimeSpan span)
+        {
 
             if (span == TimeSpan.Zero) return "0 minutes";
 
@@ -78,7 +132,7 @@ namespace LOD_CM_CLI
             if (span.Minutes > 0)
                 sb.AppendFormat("{0} minute{1} ", span.Minutes, span.Minutes > 1 ? "s" : String.Empty);
             if (span.Seconds > 0)
-                sb.AppendFormat("{0} second{1} ", span.Seconds, span.Seconds > 1 ? "s" : String.Empty);            
+                sb.AppendFormat("{0} second{1} ", span.Seconds, span.Seconds > 1 ? "s" : String.Empty);
             if (span.Milliseconds > 0)
                 sb.AppendFormat("{0} millisecond{1} ", span.Milliseconds, span.Milliseconds > 1 ? "s" : String.Empty);
             return sb.ToString();

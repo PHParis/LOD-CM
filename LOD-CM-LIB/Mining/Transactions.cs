@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using LOD_CM_CLI.Data;
@@ -15,6 +16,23 @@ namespace LOD_CM_CLI.Mining
         private Transaction() {}
 
         public List<HashSet<int>> transactions { get; private set; }
+
+        /// <summary>
+        /// Save transactions and dictionary to given file paths
+        /// </summary>
+        /// <param name="transactionsFilePath"></param>
+        /// <param name="dictionaryFilePath"></param>
+        /// <returns></returns>
+        public async Task SaveToFiles(
+            string transactionsFilePath,
+            string dictionaryFilePath)
+        {
+            await File.WriteAllLinesAsync(transactionsFilePath,
+                transactions.Select(x => string.Join(" ", x)));
+            
+            await File.WriteAllLinesAsync(dictionaryFilePath,
+                intToPredicateDict.Select(x => x.Key + " " + x.Value));
+        }
 
         /// <summary>
         /// Get transactions from given dataset about instances of given class.

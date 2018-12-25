@@ -1,3 +1,5 @@
+using System;
+
 namespace LOD_CM_CLI.Data
 {
     /// <summary>
@@ -5,6 +7,14 @@ namespace LOD_CM_CLI.Data
     /// </summary>
     public class InstanceClass
     {
+
+        public InstanceClass(string uri)
+        {
+            this.Uri = uri;
+            var maxIndex = Math.Max(uri.LastIndexOf("/"), uri.LastIndexOf("#"));
+            this.Label = uri.Substring(maxIndex + 1);
+        }
+
         /// <summary>
         /// The URI of the given class.
         /// </summary>
