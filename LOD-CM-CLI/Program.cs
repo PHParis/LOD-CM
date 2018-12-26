@@ -12,6 +12,9 @@ using Iternity.PlantUML;
 using LOD_CM_CLI.Data;
 using LOD_CM_CLI.Mining;
 using LOD_CM_CLI.Uml;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using NLog.Extensions.Logging;
 using VDS.RDF.Ontology;
 
 namespace LOD_CM_CLI
@@ -20,14 +23,17 @@ namespace LOD_CM_CLI
     {
         // const string WIKI_TYPE = "http://www.wikidata.org/prop/direct/P31";
         // const string RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-
+        public static ServiceProvider serviceProvider { get; private set; }
+        private static ILogger log;
         static async Task Main(string[] args)
         {
-
+            // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
+            Configuration(args[0]);
             var sw = Stopwatch.StartNew();
             using (var ds = await Dataset.Create(
                     Path.Combine(@"E:\download", "dataset.hdt"),
-                    Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt"))
+                    Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt"),
+                    serviceProvider)
                 .LoadHdt())//.LoadHdt() await
             {
                 ds.Label = "DBpedia";
@@ -36,24 +42,24 @@ namespace LOD_CM_CLI
                 await ComputeFpMfpImage(ds, @"E:\download");
             }
             sw.Stop();
-            Console.WriteLine(ToPrettyFormat(sw.Elapsed));
+            log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
 
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
-            Console.WriteLine("Precomputation...");            
+            log.LogInformation("Precomputation...");            
             await dataset.Precomputation();
-            Console.WriteLine("Getting classes...");
+            log.LogInformation("Getting classes...");
             var classes = await dataset.GetInstanceClasses();
             var total = classes.Count();
-            Console.WriteLine($"# classes: {total}");
-            Console.WriteLine("Looping on classes...");
+            log.LogInformation($"# classes: {total}");
+            log.LogInformation("Looping on classes...");
             var count = 1;
             // TODO: parellize this loop
-            // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
-            foreach (var instanceClass in classes)
+            foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+            // foreach (var instanceClass in classes)
             {
-                Console.WriteLine($"class: {instanceClass.Label} ({count++}/{total})");
+                log.LogInformation($"class: {instanceClass.Label} ({count++}/{total})");
                 var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
 
                 // ex: ${workingdirectory}/DBpedia/Film
@@ -75,7 +81,7 @@ namespace LOD_CM_CLI
                 {
                     var threshold = thresholdInt / 100d;
 
-                    var fp = new FrequentPattern<int>();
+                    var fp = new FrequentPattern<int>(serviceProvider);
                     fp.GetFrequentPatternV2(transactions, threshold);
                     fp.ComputeMFP();
 
@@ -107,7 +113,6 @@ namespace LOD_CM_CLI
                         var counter = 0;
                         foreach (var ig in igs)
                         {
-                            // TODO: adapt names with counter or something like that
                             await ig.GetImageContent();
                             counter++;
                             await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
@@ -139,129 +144,22 @@ namespace LOD_CM_CLI
             return sb.ToString();
 
         }
+        private static void Configuration(string configurationFilePath)
+        {
+            if (!File.Exists(configurationFilePath))
+                throw new FileNotFoundException("You must provide a valid nlog file!");
+            serviceProvider = new ServiceCollection()
+                .AddSingleton<ILoggerFactory, LoggerFactory>()
+                .AddSingleton(typeof(ILogger<>), typeof(Logger<>))
+                .BuildServiceProvider();
+
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            //configure NLog
+            loggerFactory.AddNLog(new NLogProviderOptions { CaptureMessageTemplates = true, CaptureMessageProperties = true });
+            NLog.LogManager.LoadConfiguration(configurationFilePath);
+
+
+            log = serviceProvider.GetService<ILogger<Program>>();
+        }
     }
 }
-
-#region old
-
-// StringBuilder contentBis;
-// using (var ds = await Dataset.Create(Path.Combine(
-//         @"E:\download", "dataset.hdt"
-//     )).LoadHdt())
-// {            
-//     var HashmapItemFilePath = Path.Combine(@"C:\Users\PH\Downloads",
-//         "itemHashmap.txt");
-//     var fpPath = Path.Combine(@"C:\Users\PH\Downloads",
-//     "fpgrowth_60.txt"); // fpgrowth_60 schema_minsup60
-//     var HashmapItemLines = await File.ReadAllLinesAsync(HashmapItemFilePath);
-//     var HashmapItem = HashmapItemLines.Where(x => x.Contains(" => ")).Select(x =>
-//     {
-//         var table = x.Split(" => ", StringSplitOptions.RemoveEmptyEntries);
-//         return new
-//         {
-//             id = Convert.ToInt32(table[0]),
-//             uri = table[1]
-//         };
-//     }).ToDictionary(x => x.id, x => x.uri);
-
-//     var mfpsLines = await File.ReadAllLinesAsync(fpPath);
-//     var ci = new CultureInfo("en-US");
-//     var sep = " #SUP: "; // "("
-//     var mfps = mfpsLines.Where(x => x.Contains(sep)).Select(x =>
-//     {
-//         var table = x.Split(sep, StringSplitOptions.RemoveEmptyEntries);
-//         var props = table[0].Split(" ", StringSplitOptions.RemoveEmptyEntries);
-//         return new Tuple<HashSet<int>, double>
-//         (
-//             props.Select(y => Convert.ToInt32(y)).ToHashSet(),
-//             Convert.ToDouble(table[1].Replace(")", ""), ci)
-//         );
-//     }).ToList();
-
-//     var ig = new ImageGenerator(ds);
-//     contentBis = await ig.GenerateTxtForUml("Film", 0.6, 111938, null, HashmapItem, mfps);
-//     // Console.WriteLine(contentBis.ToString());
-// }
-
-// var content =
-//     @"@startuml
-//     skinparam linetype ortho
-//     Work -- Actor : starring sup:82
-//     Work -- Person : writer sup:63
-//     Film -- Person : director sup:82
-//     class Film{
-//     name sup=98
-//     label sup=99
-//     runtime:XMLSchema#double sup=73
-//     type sup=100
-//     }
-//     Thing <|-- Agent
-//     Artist <|-- Actor
-//     Agent <|-- Person
-//     Thing <|-- Work
-//     Person <|-- Artist
-//     Work <|-- Film
-//     @enduml
-// ";
-// Console.WriteLine(content);
-// content = contentBis.ToString();
-// Console.WriteLine(content);
-// var uri = PlantUMLUrl.SVG(content);
-// using (var client = new HttpClient())
-// {
-//     var svgFile = await client.GetStringAsync(uri);
-//     await File.WriteAllTextAsync(Path.Combine(@"C:\Users\PH\Downloads",
-//     $"test_{DateTime.Now.Ticks}.svg"), svgFile);
-//     Console.WriteLine(svgFile);
-// }
-
-// var sw = new Stopwatch();
-// var transactionFilePath = Path.Combine(@"C:\Users\PH\Downloads",
-//     "transactions.txt");
-// Console.WriteLine("Reading file...");
-// var transactionsLines = await File.ReadAllLinesAsync(transactionFilePath);
-
-// Console.WriteLine("Preparing data");
-// // var dataset = transactionsLines.Select(x => 
-// //     x.Split(" ", StringSplitOptions.RemoveEmptyEntries)).ToArray();
-// long baseId = 1;
-// var dataset = transactionsLines.Select(x =>
-//     new PatternDiscovery.Transaction<string>(
-//         x.Split(" ", StringSplitOptions.RemoveEmptyEntries))
-//     {
-//         ID = baseId++
-//     }
-// ).ToList();
-// var domain = transactionsLines.SelectMany(x =>
-//     x.Split(" ", StringSplitOptions.RemoveEmptyEntries))
-//     .Distinct()
-//     .OrderBy(x => x)
-//     .ToList();
-// // string[][] dataset =
-// // {
-// //     new string[] { "1", "2", "5" },
-// //     new string[] { "2", "4" },
-// //     new string[] { "2", "3" },
-// //     new string[] { "1", "2", "4" },
-// //     new string[] { "1", "3" },
-// //     new string[] { "2", "3" },
-// //     new string[] { "1", "3" },
-// //     new string[] { "1", "2", "3", "5" },
-// //     new string[] { "1", "2", "3" },
-// // };
-// sw.Start();
-// var fp = new FrequentPattern<string>();
-// // fp.GetFrequentPattern(dataset, 0.6);
-// fp.GetFrequentPatternV2(dataset, 0.6, domain);
-// sw.Stop();
-// Console.WriteLine(sw.Elapsed);
-
-// string hdtFilePath = Path.Combine(@"C:\dev\dotnet\DotnetHDT\hdt", "67aeedb1a6d3c25f250ed4b2ce0ca50ban.hdt");
-// HashSet<string> types;
-// using (var hdt = HDTManager.LoadHDT(hdtFilePath))
-// {
-//     types = hdt.search("", RDF_TYPE, "")
-//         .Select(x => x.getObject()).ToHashSet();
-// }
-// Console.WriteLine($"# types: {types.Count}");
-#endregion

@@ -8,6 +8,8 @@ using VDS.RDF.Query;
 using VDS.RDF;
 using VDS.RDF.Ontology;
 using VDS.RDF.Parsing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace LOD_CM_CLI.Data
 {
@@ -16,6 +18,7 @@ namespace LOD_CM_CLI.Data
     /// </summary>
     public class Dataset : IDisposable
     {
+        private ILogger log;
         /// <summary>
         /// If true, then the HDT file has been opened and loaded in memory.
         /// </summary>
@@ -55,7 +58,7 @@ namespace LOD_CM_CLI.Data
             }
         }
 
-        private Dataset(string hdtFilePath, string ontologyFilePath)
+        private Dataset(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider)
         {
             IsOpen = false;
             this.hdtFilePath = hdtFilePath;
@@ -68,6 +71,7 @@ namespace LOD_CM_CLI.Data
             objectProperties = new Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)>();
             dataTypeProperties = new Dictionary<string, string>();
             // objectPropertiesRange = new Dictionary<string, HashSet<string>>();
+            log = serviceProvider.GetService<ILogger<Dataset>>();
         }
 
         /// <summary>
@@ -108,9 +112,9 @@ namespace LOD_CM_CLI.Data
                 .Select(x => x.getObject()).ToHashSet();
         }
 
-        public static Dataset Create(string hdtFilePath, string ontologyFilePath)
+        public static Dataset Create(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider)
         {
-            return new Dataset(hdtFilePath, ontologyFilePath);
+            return new Dataset(hdtFilePath, ontologyFilePath, serviceProvider);
         }
 
         /// <summary>
@@ -167,25 +171,25 @@ namespace LOD_CM_CLI.Data
                 x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty)||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
                 .Select(x => x.Subject.ToString()).Distinct().ToList();
-            Console.WriteLine($"# properties: {properties.Count}");
+            log.LogInformation($"# properties: {properties.Count}");
             foreach (var property in properties)
             {
                 await GetPropertyDomainRangeOrDataType(property);
             }
-            Console.WriteLine($"classes...");
+            log.LogInformation($"classes...");
             superClassesOfClass = new Dictionary<string, HashSet<string>>();
             var classes = ontology.Triples.Where(x => 
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
                 .Select(x => x.Subject.ToString()).Distinct().ToList();
-            Console.WriteLine($"# classes: {classes.Count}");
+            log.LogInformation($"# classes: {classes.Count}");
             foreach (var @class in classes)
             {
                 var set = FindSuperClasses(@class, Level.First);
                 superClassesOfClass[@class] = set;
             }
-            Console.WriteLine($"classes done");
+            log.LogInformation($"classes done");
         }
 
         /// <summary>

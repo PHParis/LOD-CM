@@ -6,9 +6,11 @@
     <RootNamespace>LOD_CM_LIB</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Accord.MachineLearning" Version="3.8.2-alpha" />
+    <!-- <PackageReference Include="Accord.MachineLearning" Version="3.8.2-alpha" /> -->
     <PackageReference Include="dotNetRDF" Version="2.2.0-pre0001" />
     <PackageReference Include="HDTDotnet" Version="0.0.1-alpha" />
     <PackageReference Include="iTernity.plantuml" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.0-preview.18572.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0-preview.18572.1" />
   </ItemGroup>
 </Project>

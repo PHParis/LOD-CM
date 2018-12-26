@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Accord.MachineLearning.Rules;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PatternDiscovery;
 using PatternDiscovery.FrequentPatterns;
 
@@ -14,9 +15,15 @@ namespace LOD_CM_CLI.Mining
     /// </summary>
     public class FrequentPattern<T> where T : System.IComparable<T>, IConvertible
     {
+        private ILogger log;
         public TransactionList<T> transactions {get;private set;}
         public double minSupport { get; private set; }
         public ItemSets<T> fis { get; private set; }
+
+        public FrequentPattern(ServiceProvider serviceProvider)
+        {
+            log = serviceProvider.GetService<ILogger<FrequentPattern<T>>>();
+        }
         
         
         /// <summary>
@@ -61,21 +68,21 @@ namespace LOD_CM_CLI.Mining
             this.minSupport = minSupport;
             // this.objectPropertiesInfo = new List<(HashSet<string> classes, int propertySupport, bool dash)>();
             var domain = transactions.domain;
-            Console.WriteLine("Mining...");
+            log.LogInformation("Mining...");
             var method = new PatternDiscovery.FrequentPatterns.Apriori<T>();
             fis = method.MinePatterns(transactions.transactions, minSupport, domain);
             #region MFP
             // var fisSet = fis.Select(x => x.ToHashSet()).ToHashSet();  
             // for (int i = 0; i < fis.Count; ++i)
             // {
-            //     Console.WriteLine(string.Join(" ", fis[i]) + " #SUP: " + fis[i].TransactionCount
+            //     log.LogInformation(string.Join(" ", fis[i]) + " #SUP: " + fis[i].TransactionCount
             //         + " " + IsMFPV2(fis[i].ToHashSet(), fisSet));
             // }
 
-            // Console.WriteLine("Maximum");
+            // log.LogInformation("Maximum");
             // foreach (var rule in GetMFPV2(fisSet))
             // {
-            //     Console.WriteLine(string.Join(" ", rule));
+            //     log.LogInformation(string.Join(" ", rule));
             // }
             #endregion
             return fis;
