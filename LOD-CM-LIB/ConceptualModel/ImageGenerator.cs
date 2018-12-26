@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Text;
 using Iternity.PlantUML;
 using System.Net.Http;
+using LOD_CM_CLI.Utils;
 
 namespace LOD_CM_CLI.Uml
 {
@@ -20,7 +21,12 @@ namespace LOD_CM_CLI.Uml
         private Dataset ds;
 
         private ImageGenerator() { }
-        public Dictionary<int, string> propertyMinsup {get;private set;}
+
+        /// <summary>
+        /// Key is the property id, value is its support
+        /// </summary>
+        /// <value></value>
+        public Dictionary<int, int> propertyMinsup { get; private set; }
 
         /// <summary>
         /// Content sended to PlantUML for image generation
@@ -32,7 +38,7 @@ namespace LOD_CM_CLI.Uml
         /// </summary>
         /// <value></value>
         public string svgFileContent { get; private set; }
-        
+
         /// <summary>
         /// Download SVG file content from PlantUML
         /// </summary>
@@ -46,7 +52,7 @@ namespace LOD_CM_CLI.Uml
             }
             return svgFileContent;
         }
-        
+
         public async Task SaveImage(string filePath)
         {
             await File.WriteAllTextAsync(filePath, svgFileContent);
@@ -55,7 +61,7 @@ namespace LOD_CM_CLI.Uml
         {
             await File.WriteAllTextAsync(filePath, contentForUml);
         }
-           
+
 
         public static async Task<ImageGenerator> GenerateTxtForUml(Dataset ds,
             InstanceClass instanceClass, double threshold,
@@ -63,161 +69,138 @@ namespace LOD_CM_CLI.Uml
         {
             var result = new ImageGenerator();
             result.ds = ds;
-            result.propertyMinsup = new Dictionary<int, string>();
-            var attributes = "";
+            result.propertyMinsup = new Dictionary<int, int>();
+
             var cModel = new StringBuilder();
-            var finalclass = new HashSet<string>();
 
             cModel.AppendLine("@startuml");
             cModel.AppendLine("skinparam linetype ortho");
 
-            var classes = new HashSet<string>();
-            var classesWithSubclass = new HashSet<string>();
-
-            double support;
-
-            classes.Add(instanceClass.Uri);
-
-            var numberOfTransactions = transactions.transactions.Count;
+            var thresholdInt = Convert.ToInt32(threshold * 100);
             foreach (var line in mfps)
             {
-                support = line.TransactionCount;
-
-                var supp = (int)((support / numberOfTransactions) * 100);
-                var thre = Convert.ToInt32(threshold * 100);
-                if (line.Count == 1 && thre <= supp) // TODO: but why take only line with only one property
-                    result.propertyMinsup.Add(line[0], supp.ToString());
+                var currentSupportInt = Convert.ToInt32(line.Support * 100);
+                if (line.Count == 1 && thresholdInt <= currentSupportInt) // TODO: but why take only line with only one property
+                    result.propertyMinsup.Add(line[0], currentSupportInt);
             }
 
             var rdfType = ds.ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
             var owlObjectProp = ds.ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
             // in this loop we check for each property, if it is an
             // object property or not
-            var objectProperties = result.propertyMinsup.Select(p => ds.ontology.GetUriNode(new Uri(p.Value)))
+            var objectProperties = result.propertyMinsup.Select(p =>
+                ds.ontology.GetUriNode(new Uri(transactions.intToPredicateDict[p.Key])))
                 .Where(p => p != null).Where(p => ds.ontology.ContainsTriple(
                     new Triple(p, rdfType, owlObjectProp)))
-                    .Select(x => x.Uri.AbsolutePath).ToList();
-            var notObjectProperties = result.propertyMinsup.Select(p => p.Value)
+                    .Select(x => x.Uri.AbsoluteUri).ToList();
+            var notObjectProperties = result.propertyMinsup.Select(p => transactions.intToPredicateDict[p.Key])
                 .Except(objectProperties).ToList();
 
-            foreach (string opp in objectProperties)
+            var classes = new HashSet<string>();
+            classes.Add(instanceClass.Uri);
+            // we search domain and range for each object property
+            // to iteratively create the class diagram
+            foreach (var op in objectProperties)
             {
 
-                int cc = transactions.predicateToIntDict[opp];//HashmapItem.Where(x => x.Value == opp).Select(x => x.Key).FirstOrDefault();//getKey(HashmapItem, opp);
-                string vv = result.propertyMinsup.GetValueOrDefault(cc);
+                var opIndex = transactions.predicateToIntDict[op];
+                var propertySupport = result.propertyMinsup.GetValueOrDefault(opIndex);
 
-                string dd = "";
-                string rr = "";
-                bool dash = false;
                 var domain = ds.ontology.Triples.Where(x =>
-                    x.Subject.ToString().Equals(opp) &&
+                    x.Subject.ToString().Equals(op) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyDomain))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
 
 
                 var range = ds.ontology.Triples.Where(x =>
-                    x.Subject.ToString().Equals(opp) &&
+                    x.Subject.ToString().Equals(op) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
 
+                string dd;
+                string rr;
+                var dash = false;
 
                 if (domain == null)
                 {
-                    dd = await result.FindRangeOrDomain(opp, RangeOrDomain.Domain);
+                    dd = await result.FindRangeOrDomain(op, RangeOrDomain.Domain);
                     classes.Add(dd);
                     dash = true;
                 }
-                else if (domain != null)
-                    dd = domain.ToString();
-                classes.Add(dd.ToString());
+                else
+                    dd = domain; // FIXME: ToString to delete
+                classes.Add(dd);
 
                 if (range == null)
                 {
-                    rr = await result.FindRangeOrDomain(opp, RangeOrDomain.Range);
+                    rr = await result.FindRangeOrDomain(op, RangeOrDomain.Range);
                     classes.Add(rr);
                     dash = true;
                 }
-                else if (range != null)
-                    rr = range.ToString();
-                classes.Add(rr.ToString());
+                else
+                    rr = range;
+                classes.Add(rr);
 
-                string d = dd.Substring(dd.LastIndexOf("/") + 1);
-                string r = rr.Substring(rr.LastIndexOf("/") + 1);
-                string p = opp.Substring(opp.LastIndexOf("/") + 1);
-                if (d.Contains("#"))
-                    d = d.Substring(d.LastIndexOf("#") + 1);
-                if (r.Contains("#"))
-                    r = r.Substring(r.LastIndexOf("#") + 1);
+                var d = dd.GetUriFragment();
+                var r = rr.GetUriFragment();
+                var p = op.GetUriFragment();
                 if (r.Equals(d))
                     continue;
                 if (dash)
-                    cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + vv);
+                    cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
                 else
-                    cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + vv);
+                    cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + propertySupport);
             }
 
             cModel.AppendLine("class " + instanceClass.Label + "{");
-            foreach (string dtp in notObjectProperties)
+            foreach (var dtp in notObjectProperties)
             {
 
                 int cc = transactions.predicateToIntDict[dtp];//HashmapItem.Where(x => x.Value == dtp).Select(x => x.Key).FirstOrDefault();//.GetValueOrDefault(dtp);// getKey(HashmapItem, dtp);
-                string vv = result.propertyMinsup.GetValueOrDefault(cc);
+                var sup = result.propertyMinsup.GetValueOrDefault(cc);
                 var val = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(dtp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
-                string p = dtp.Substring(dtp.LastIndexOf("/") + 1);
-                if (p.Contains("#"))
-                    p = p.Substring(p.LastIndexOf("#") + 1);
+                string p = dtp.GetUriFragment();
                 if (val != null)
                 {
-                    string r = val.Substring(val.LastIndexOf("/") + 1);
-                    cModel.AppendLine(p + ":" + r + " sup=" + vv);
+                    string r = val.GetUriFragment();
+                    cModel.AppendLine(p + ":" + r + " sup=" + sup);
                 }
                 else
                 {
-                    cModel.AppendLine(p + " sup=" + vv);
+                    cModel.AppendLine(p + " sup=" + sup);
                 }
             }
-            attributes = attributes + "}";
-            cModel.AppendLine(attributes);
+            cModel.AppendLine("}");
 
-            HashSet<string> subclasses = new HashSet<string>();
-            foreach (string c in classes)
+            var classesAndSuperClasses = new HashSet<string>();
+            // get all super classes of the given class
+            foreach (var c in classes)
             {
-                classesWithSubclass.Add(c);
-                subclasses = result.findSubclassAll(c);
-                foreach (string s in subclasses)
-                    classesWithSubclass.Add(s);
+                classesAndSuperClasses.Add(c);
+                var subclasses = result.FindSuperClasses(c, Level.All);
+                foreach (var s in subclasses)
+                    classesAndSuperClasses.Add(s);
             }
-            foreach (string c in classesWithSubclass)
+            // get the first super class for each class
+            foreach (var c in classesAndSuperClasses)
             {
-                subclasses = result.findSubclass(c);
+                var superClasses = result.FindSuperClasses(c, Level.First);
 
-                if (subclasses.Count == 0)
+                if (!superClasses.Any())
                     continue;
-                foreach (string sc in subclasses)
+                foreach (var sc in superClasses)
                 {
-                    string c1 = c.Substring(c.LastIndexOf("/") + 1);
-                    string c2 = sc.Substring(sc.LastIndexOf("/") + 1);
-                    if (c1.Equals(c2))
+                    if (c.Equals(sc))
                         continue;
-                    if (c1.Contains("#"))
-                        c1 = c1.Substring(c1.LastIndexOf("#") + 1);
-                    if (c2.Contains("#"))
-                        c2 = c2.Substring(c2.LastIndexOf("#") + 1);
+                    var c1 = c.GetUriFragment();
+                    var c2 = sc.GetUriFragment();
                     cModel.AppendLine(c2 + " <|-- " + c1);
-                    if (c1.Contains("Thing"))
-                        continue;
-                    else
-                        finalclass.Add("\"" + c1 + "\"");
-                    if (c2.Contains("Thing"))
-                        continue;
-                    else
-                        finalclass.Add("\"" + c2 + "\"");
                 }
             }
 
@@ -225,27 +208,31 @@ namespace LOD_CM_CLI.Uml
             result.contentForUml = cModel.ToString();
             return result;
         }
+
         
-        
-        public HashSet<string> findSubclassAll(string aClass)
+        public enum Level
         {
-            var subClasses = new HashSet<string>();
-            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + aClass
-                    + "> rdfs:subClassOf* ?superClass . " + " } ";
-            var results = (SparqlResultSet)ds.ontology.ExecuteQuery(query);
-            foreach (var result in results)
-            {
-                var superclass = result["superClass"].ToString();
-                subClasses.Add(superclass);
-            }
-            return subClasses;
+            First,
+            All
         }
-        public HashSet<string> findSubclass(string aClass)
+
+        /// <summary>
+        /// Return one subclass if level is set to First, and
+        /// all super classes if level is set to all.
+        /// </summary>
+        /// <param name="aClass"></param>
+        /// <param name="level"></param>
+        /// <returns></returns>
+        public HashSet<string> FindSuperClasses(string aClass, Level level)
         {
-            var subClasses = new HashSet<string>();
-            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + aClass
-                    + "> rdfs:subClassOf ?superClass . " + " } ";
+            var multipleLevels = level == Level.All ? "*" : string.Empty;
+            var query = @"
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+                SELECT * WHERE { 
+                    <" + aClass + @"> rdfs:subClassOf" + multipleLevels + @" ?superClass . 
+                }";
             var results = (SparqlResultSet)ds.ontology.ExecuteQuery(query);
+            var subClasses = new HashSet<string>();
             foreach (var result in results)
             {
                 var superclass = result["superClass"].ToString();

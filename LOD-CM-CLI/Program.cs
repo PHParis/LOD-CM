@@ -48,7 +48,7 @@ namespace LOD_CM_CLI
             Console.WriteLine("Looping on classes...");
             var count = 1;
             // TODO: parellize this loop
-            foreach (var instanceClass in classes)
+            foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
             {
                 Console.WriteLine($"class: {instanceClass.Label} ({count++}/{total})");
                 var transactions = await Transaction.GetTransactions(dataset, instanceClass);

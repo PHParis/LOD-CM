@@ -88,17 +88,17 @@ namespace LOD_CM_CLI.Mining
         }
                 
         /// <summary>
-        /// Return all Maximum Frequent Pattern from a Frequent Pattern list.
+        /// Compute all Maximum Frequent Pattern from a Frequent Pattern list.
         /// </summary>
         /// <param name="rules"></param>
         /// <returns></returns>
-        public IEnumerable<HashSet<T>> GetMFP(
-            HashSet<HashSet<T>> fis)
+        public void ComputeMFP()
         {
-            foreach (var rule in fis)
+            var fisSet = fis.Select(x => x.ToHashSet()).ToHashSet();
+            foreach (var itemSet in fis)
             {
-                if (IsMFP(rule, fis))
-                    yield return rule;
+                var set = itemSet.ToHashSet();
+                itemSet.IsMaximal = IsMFP(set, fisSet);
             }
         }
 

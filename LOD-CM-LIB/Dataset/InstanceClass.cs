@@ -1,4 +1,5 @@
 using System;
+using LOD_CM_CLI.Utils;
 
 namespace LOD_CM_CLI.Data
 {
@@ -11,8 +12,7 @@ namespace LOD_CM_CLI.Data
         public InstanceClass(string uri)
         {
             this.Uri = uri;
-            var maxIndex = Math.Max(uri.LastIndexOf("/"), uri.LastIndexOf("#"));
-            this.Label = uri.Substring(maxIndex + 1);
+            this.Label = uri.GetUriFragment();
         }
 
         /// <summary>
