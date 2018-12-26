@@ -12,6 +12,7 @@ using Iternity.PlantUML;
 using LOD_CM_CLI.Data;
 using LOD_CM_CLI.Mining;
 using LOD_CM_CLI.Uml;
+using VDS.RDF.Ontology;
 
 namespace LOD_CM_CLI
 {
@@ -30,6 +31,8 @@ namespace LOD_CM_CLI
                 .LoadHdt())//.LoadHdt() await
             {
                 ds.Label = "DBpedia";
+                ds.PropertyType = OntologyHelper.PropertyType;
+                ds.OntologyNameSpace = "http://dbpedia.org/ontology/";
                 await ComputeFpMfpImage(ds, @"E:\download");
             }
             sw.Stop();
@@ -38,24 +41,20 @@ namespace LOD_CM_CLI
 
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
-            // var ic = new InstanceClass
-            // {
-            //     Uri = "http://dbpedia.org/ontology/Film",
-            //     Label = "Film"
-            // };
             Console.WriteLine("Getting classes...");
             var classes = await dataset.GetInstanceClasses();
             var total = classes.Count();
             Console.WriteLine($"# classes: {total}");
             Console.WriteLine("Looping on classes...");
             var count = 1;
+            // TODO: parellize this loop
             foreach (var instanceClass in classes)
             {
                 Console.WriteLine($"class: {instanceClass.Label} ({count++}/{total})");
-                var transaction = await Transaction.GetTransactions(dataset, instanceClass);
+                var transactions = await Transaction.GetTransactions(dataset, instanceClass);
 
                 long baseId = 0;
-                var transactionBis = transaction.transactions.Select(x =>
+                var transactionPatternDiscovery = transactions.transactions.Select(x =>
                     new PatternDiscovery.Transaction<int>(x.ToArray())
                     {
                         ID = baseId++
@@ -69,19 +68,22 @@ namespace LOD_CM_CLI
                     instanceClass.Label
                 );
                 Directory.CreateDirectory(instancePath);
-                await transaction.SaveToFiles(
+                await transactions.SaveToFiles(
                     Path.Combine(instancePath, "transactions.txt"),
                     Path.Combine(instancePath, "dictionary.txt")
                 );
 
                 var fpSet = new List<FrequentPattern<int>>();
 
-                foreach (var thresholdInt in Enumerable.Range(1, 100))
+                // TODO: put back enumeration over range
+                foreach (var thresholdInt in new[] {80})//Enumerable.Range(1, 100))
                 {
                     var threshold = thresholdInt / 100d;
 
                     var fp = new FrequentPattern<int>();
-                    fp.GetFrequentPatternV2(transactionBis, threshold, transaction.domain);
+                    fp.GetFrequentPatternV2(transactionPatternDiscovery, threshold, transactions.domain);
+                    // previousFP.GetMFPV2()
+                    // TODO: compute MFP here. We don't use FP anymore
 
                     var imageFilePath = Path.Combine(
                         instancePath,
@@ -103,13 +105,13 @@ namespace LOD_CM_CLI
                     else
                     {
                         fpSet.Add(fp);
-                        var ig = new ImageGenerator(dataset);
-                        var contentForUml = await ig.GenerateTxtForUml(instanceClass.Label,
-                            threshold, transaction.transactions.Count(), fp.fis,
-                            transaction.intToPredicateDict, null);
+                        await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
+
+                        // var ig = new ImageGenerator(dataset);
+                        var ig = await ImageGenerator.GenerateTxtForUml(dataset,
+                            instanceClass, threshold, fp.fis, transactions);
 
                         await ig.GetImageContent();
-                        await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
                         await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, "plant.txt"));
                         await ig.SaveImage(Path.Combine(imageFilePath, "img.svg"));
                     }

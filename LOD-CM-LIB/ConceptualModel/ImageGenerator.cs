@@ -17,16 +17,11 @@ namespace LOD_CM_CLI.Uml
 {
     public class ImageGenerator
     {
-        Dataset ds;
+        private Dataset ds;
 
-        public ImageGenerator(Dataset ds)
-        {
-            this.ds = ds;
-            propertyMinsup = new Dictionary<int, string>();
-        }
-        public Dictionary<int, string> propertyMinsup;// = new Dictionary<int, string>();
+        private ImageGenerator() { }
+        public Dictionary<int, string> propertyMinsup {get;private set;}
 
-        // public static Dictionary<int, string> HashmapItem = new Dictionary<int, string>();
         /// <summary>
         /// Content sended to PlantUML for image generation
         /// </summary>
@@ -37,34 +32,21 @@ namespace LOD_CM_CLI.Uml
         /// </summary>
         /// <value></value>
         public string svgFileContent { get; private set; }
-        // private static IGraph _dbpOnt;
-        // public static IGraph dbpOnt
-        // {
-        //     get
-        //     {
-        //         if (_dbpOnt == null)
-        //         {
-        //             _dbpOnt = new Graph();
-        //             FileLoader.Load(_dbpOnt, Path.Combine(
-        //                 @"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples",
-        //                 "dbpedia_2016-10.nt")); // dbpedia_2016-10.nt
-        //                                         //dbpedia_2014.owl
-        //             Console.WriteLine("DBpedia onto loaded");
-        //         }
-        //         return _dbpOnt;
-        //     }
-        // }
-
-        public async Task GetImageContent()
+        
+        /// <summary>
+        /// Download SVG file content from PlantUML
+        /// </summary>
+        /// <returns></returns>
+        public async Task<string> GetImageContent()
         {
             var uri = PlantUMLUrl.SVG(contentForUml);
             using (var client = new HttpClient())
             {
                 svgFileContent = await client.GetStringAsync(uri);
             }
+            return svgFileContent;
         }
-
-        // public static Uri RDFType = new Uri("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+        
         public async Task SaveImage(string filePath)
         {
             await File.WriteAllTextAsync(filePath, svgFileContent);
@@ -73,100 +55,56 @@ namespace LOD_CM_CLI.Uml
         {
             await File.WriteAllTextAsync(filePath, contentForUml);
         }
+           
 
-        public async Task<string> GenerateTxtForUml(string type, double threshold,
-            int numberofTransactions, PatternDiscovery.ItemSets<int> mfps,
-            Dictionary<int, string> HashmapItem, List<Tuple<HashSet<int>, double>> mfpsV2)
+        public static async Task<ImageGenerator> GenerateTxtForUml(Dataset ds,
+            InstanceClass instanceClass, double threshold,
+            PatternDiscovery.ItemSets<int> mfps, Mining.Transaction transactions)
         {
-            // log.debug("entering CreateTxtFile...");
-            // log.debug("type: " + type);
-            // log.debug("threshold: " + threshold);
-            // log.debug("numberofTransactions: " + numberofTransactions);
-            string attributes = "";
-            var CModel = new StringBuilder();
-            HashSet<string> finalclass = new HashSet<string>();
-            CModel.AppendLine("@startuml");
-            CModel.AppendLine("skinparam linetype ortho");
+            var result = new ImageGenerator();
+            result.ds = ds;
+            result.propertyMinsup = new Dictionary<int, string>();
+            var attributes = "";
+            var cModel = new StringBuilder();
+            var finalclass = new HashSet<string>();
 
-            HashSet<string> classes = new HashSet<string>();
-            HashSet<string> classesWithSubclass = new HashSet<string>();
-            // BufferedReader reader = null;
+            cModel.AppendLine("@startuml");
+            cModel.AppendLine("skinparam linetype ortho");
 
-            string pattern;
+            var classes = new HashSet<string>();
+            var classesWithSubclass = new HashSet<string>();
+
             double support;
 
-            List<string> ObjectProperties = new List<string>();
-            List<string> NotObjectProperties = new List<string>();
-            classes.Add("http://dbpedia.org/ontology/" + type);
+            classes.Add(instanceClass.Uri);
 
-            // string line;
-            // readHashmap();
-            // File file = new File(this.mfpPathFile);
-            // reader = new BufferedReader(new FileReader(file));
+            var numberOfTransactions = transactions.transactions.Count;
+            foreach (var line in mfps)
+            {
+                support = line.TransactionCount;
 
-            if (mfps != null)
-            {
-                foreach (var line in mfps)
-                {
-                    // pattern = line.Substring(0, line.indexOf(" #"));
-                    support = line.TransactionCount;//Double.parseDouble(line.Substring(line.indexOf("#") + 5));
-                    int[] properties = line.ToArray();//pattern.split(" ");
-                    int supp = (int)((support / numberofTransactions) * 100);
-                    int thre = Convert.ToInt32(threshold * 100);
-                    if (properties.Length == 1 && thre <= supp)
-                        propertyMinsup.Add(properties[0], supp.ToString());
-                }
-            }
-            else
-            {
-                foreach (var line in mfpsV2)
-                {
-                    // pattern = line.Substring(0, line.indexOf(" #"));
-                    support = line.Item2;//Double.parseDouble(line.Substring(line.indexOf("#") + 5));
-                    string[] properties = line.Item1.Select(x => x.ToString()).ToArray();//pattern.split(" ");
-                    // int supp = Convert.ToInt32(Math.Floor(support * 100));
-                    int supp = (int)((support / numberofTransactions) * 100);
-                    int thre = Convert.ToInt32(threshold * 100);
-                    if (properties.Length == 1 && thre <= supp)
-                        propertyMinsup.Add(Convert.ToInt32(properties[0]), supp.ToString());
-                }
+                var supp = (int)((support / numberOfTransactions) * 100);
+                var thre = Convert.ToInt32(threshold * 100);
+                if (line.Count == 1 && thre <= supp) // TODO: but why take only line with only one property
+                    result.propertyMinsup.Add(line[0], supp.ToString());
             }
 
-            // reader.close();
             var rdfType = ds.ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
-            foreach (int name in propertyMinsup.Keys)
+            var owlObjectProp = ds.ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
+            // in this loop we check for each property, if it is an
+            // object property or not
+            var objectProperties = result.propertyMinsup.Select(p => ds.ontology.GetUriNode(new Uri(p.Value)))
+                .Where(p => p != null).Where(p => ds.ontology.ContainsTriple(
+                    new Triple(p, rdfType, owlObjectProp)))
+                    .Select(x => x.Uri.AbsolutePath).ToList();
+            var notObjectProperties = result.propertyMinsup.Select(p => p.Value)
+                .Except(objectProperties).ToList();
+
+            foreach (string opp in objectProperties)
             {
 
-                int key = name;
-
-                string property = HashmapItem[key];
-                var propertyNode = ds.ontology.GetUriNode(new Uri(property));
-                if (propertyNode == null) continue;
-                bool NOObjectProperty = true;
-                var listTypes = ds.ontology.GetTriplesWithSubjectPredicate(
-                    propertyNode, rdfType).Select(x => x.Object as IUriNode)
-                    .ToHashSet();
-                // HashSet<RDFNode> listTypes = dbpOnt.listStatements(ResourceFactory.createResource(property),
-                //         ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), (RDFNode)null)
-                //         .toList().stream().map(Statement::getObject).collect(Collectors.toSet());
-                foreach (var typ1 in listTypes)
-                {
-                    if (typ1.Uri.AbsoluteUri.Contains("#ObjectProperty"))
-                    {
-                        ObjectProperties.Add(property);
-                        NOObjectProperty = false;
-                        break;
-                    }
-                }
-                if (NOObjectProperty)
-                    NotObjectProperties.Add(property);
-            }
-
-            foreach (string opp in ObjectProperties)
-            {
-
-                int cc = getKey(HashmapItem, opp);
-                string vv = propertyMinsup.GetValueOrDefault(cc);
+                int cc = transactions.predicateToIntDict[opp];//HashmapItem.Where(x => x.Value == opp).Select(x => x.Key).FirstOrDefault();//getKey(HashmapItem, opp);
+                string vv = result.propertyMinsup.GetValueOrDefault(cc);
 
                 string dd = "";
                 string rr = "";
@@ -176,22 +114,18 @@ namespace LOD_CM_CLI.Uml
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyDomain))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
-                // RDFNode domain = dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.domain) != null
-                //         ? dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.domain).getObject()
-                //         in null;
+
 
                 var range = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(opp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
-                // RDFNode range = dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.range) != null
-                //         ? dbpOnt.getProperty(ResourceFactory.createResource(opp), RDFS.range).getObject()
-                //         in null;
+
 
                 if (domain == null)
                 {
-                    dd = await FindDomain(opp);
+                    dd = await result.FindRangeOrDomain(opp, RangeOrDomain.Domain);
                     classes.Add(dd);
                     dash = true;
                 }
@@ -201,7 +135,7 @@ namespace LOD_CM_CLI.Uml
 
                 if (range == null)
                 {
-                    rr = await FindRange(opp);
+                    rr = await result.FindRangeOrDomain(opp, RangeOrDomain.Range);
                     classes.Add(rr);
                     dash = true;
                 }
@@ -210,14 +144,8 @@ namespace LOD_CM_CLI.Uml
                 classes.Add(rr.ToString());
 
                 string d = dd.Substring(dd.LastIndexOf("/") + 1);
-                // string d = ResourceFactory.createResource(dd).ToString()
-                //         .Substring(ResourceFactory.createResource(dd).ToString().LastIndexOf("/") + 1);
                 string r = rr.Substring(rr.LastIndexOf("/") + 1);
-                // string r = ResourceFactory.createResource(rr).ToString()
-                //         .Substring(ResourceFactory.createResource(rr).ToString().LastIndexOf("/") + 1);
                 string p = opp.Substring(opp.LastIndexOf("/") + 1);
-                // string p = ResourceFactory.createProperty(opp).ToString()
-                //         .Substring(ResourceFactory.createProperty(opp).ToString().LastIndexOf("/") + 1);
                 if (d.Contains("#"))
                     d = d.Substring(d.LastIndexOf("#") + 1);
                 if (r.Contains("#"))
@@ -225,78 +153,63 @@ namespace LOD_CM_CLI.Uml
                 if (r.Equals(d))
                     continue;
                 if (dash)
-                    CModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + vv);
+                    cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + vv);
                 else
-                    CModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + vv);
+                    cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + vv);
             }
-            // attributes = "class " + type + "{\n";
-            CModel.AppendLine("class " + type + "{");
-            foreach (string dtp in NotObjectProperties)
+
+            cModel.AppendLine("class " + instanceClass.Label + "{");
+            foreach (string dtp in notObjectProperties)
             {
 
-                int cc = getKey(HashmapItem, dtp);
-                string vv = propertyMinsup.GetValueOrDefault(cc);
+                int cc = transactions.predicateToIntDict[dtp];//HashmapItem.Where(x => x.Value == dtp).Select(x => x.Key).FirstOrDefault();//.GetValueOrDefault(dtp);// getKey(HashmapItem, dtp);
+                string vv = result.propertyMinsup.GetValueOrDefault(cc);
                 var val = ds.ontology.Triples.Where(x =>
                     x.Subject.ToString().Equals(dtp) &&
                     x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                     .Select(x => x.Object.ToString())
                     .FirstOrDefault();
-                // RDFNode val = dbpOnt.getProperty(ResourceFactory.createResource(dtp), RDFS.range) != null
-                //         ? dbpOnt.getProperty(ResourceFactory.createResource(dtp), RDFS.range).getObject()
-                //         in null;
                 string p = dtp.Substring(dtp.LastIndexOf("/") + 1);
-                // string p = ResourceFactory.createProperty(dtp).ToString()
-                //         .Substring(ResourceFactory.createProperty(dtp).ToString().LastIndexOf("/") + 1);
                 if (p.Contains("#"))
                     p = p.Substring(p.LastIndexOf("#") + 1);
                 if (val != null)
                 {
                     string r = val.Substring(val.LastIndexOf("/") + 1);
-                    // string r = ResourceFactory.createResource(val.ToString()).ToString()
-                    //         .Substring(ResourceFactory.createResource(val.ToString()).ToString().LastIndexOf("/") + 1);
-                    // attributes = attributes + p + ":" + r + " sup=" + vv + "\n";
-                    CModel.AppendLine(p + ":" + r + " sup=" + vv);
+                    cModel.AppendLine(p + ":" + r + " sup=" + vv);
                 }
                 else
                 {
-                    // attributes = attributes + p + " sup=" + vv + "\n";
-                    CModel.AppendLine(p + " sup=" + vv);
+                    cModel.AppendLine(p + " sup=" + vv);
                 }
             }
             attributes = attributes + "}";
-            CModel.AppendLine(attributes);
+            cModel.AppendLine(attributes);
 
             HashSet<string> subclasses = new HashSet<string>();
             foreach (string c in classes)
             {
                 classesWithSubclass.Add(c);
-                subclasses = findSubclassAll(c);
+                subclasses = result.findSubclassAll(c);
                 foreach (string s in subclasses)
                     classesWithSubclass.Add(s);
             }
             foreach (string c in classesWithSubclass)
             {
-                subclasses = findSubclass(c);
+                subclasses = result.findSubclass(c);
 
                 if (subclasses.Count == 0)
                     continue;
                 foreach (string sc in subclasses)
                 {
-                    // outputModelsupclasses.Add(ResourceFactory.createStatement(ResourceFactory.createResource(c.ToString()),
-                    //         sub, ResourceFactory.createResource(sc.ToString())));
                     string c1 = c.Substring(c.LastIndexOf("/") + 1);
-                    // string c1 = ResourceFactory.createResource(c).ToString()
-                    //         .Substring(ResourceFactory.createResource(c).ToString().LastIndexOf("/") + 1);
                     string c2 = sc.Substring(sc.LastIndexOf("/") + 1);
-                    // string c2 = ResourceFactory.createResource(sc).ToString()
-                    //         .Substring(ResourceFactory.createResource(sc).ToString().LastIndexOf("/") + 1);
                     if (c1.Equals(c2))
                         continue;
                     if (c1.Contains("#"))
                         c1 = c1.Substring(c1.LastIndexOf("#") + 1);
                     if (c2.Contains("#"))
                         c2 = c2.Substring(c2.LastIndexOf("#") + 1);
-                    CModel.AppendLine(c2 + " <|-- " + c1);
+                    cModel.AppendLine(c2 + " <|-- " + c1);
                     if (c1.Contains("Thing"))
                         continue;
                     else
@@ -308,249 +221,81 @@ namespace LOD_CM_CLI.Uml
                 }
             }
 
-            CModel.AppendLine("@enduml");
-            contentForUml = CModel.ToString();
-            return contentForUml;
-            // Path fileCModel = Paths
-            //         .get("/srv/www/htdocs/demo_conception/pictures_uml/CModel_" + type + "_" + threshold + ".txt");
-            // Files.write(fileCModel, CModel, Charset.forName("UTF-8"));
-
-            // try (FileWriter fileJSON = new FileWriter(
-            //         "/srv/www/htdocs/demo_conception/pictures_uml/JSONclasses_" + type + "_" + threshold + ".json")) {
-            //     fileJSON.write(finalclass.ToString());
-            //     fileJSON.flush();
-            //     fileJSON.close();
-            //     System.out.println("Successfully Copied JSON Object to File...");
-            //     System.out.println("\nJSON Object C BON");
-            // } catch (IOException e) {
-            //     e.printStackTrace();
-            // }
-
-            // if (!System.getProperty("os.name").toLowerCase().Contains("windows")) {
-            //     // allow the web interface to handle files
-            //     HashSet<PosixFilePermission> perms = Files.readAttributes(fileCModel, PosixFileAttributes.class).permissions();
-            //     perms.Add(PosixFilePermission.OWNER_WRITE);
-            //     perms.Add(PosixFilePermission.OWNER_READ);
-            //     perms.Add(PosixFilePermission.OWNER_EXECUTE);
-            //     perms.Add(PosixFilePermission.GROUP_WRITE);
-            //     perms.Add(PosixFilePermission.GROUP_READ);
-            //     perms.Add(PosixFilePermission.GROUP_EXECUTE);
-            //     perms.Add(PosixFilePermission.OTHERS_WRITE);
-            //     perms.Add(PosixFilePermission.OTHERS_READ);
-            //     perms.Add(PosixFilePermission.OTHERS_EXECUTE);
-            //     Files.setPosixFilePermissions(fileCModel, perms);
-            // }
-
-            // Main.saveModel(outputModelsupclasses, "/srv/www/htdocs/demo_conception/pictures_uml/subclasses.ttl",
-            //         RDFFormat.TTL);
-            // Main.saveModel(outputModelrelations, "/srv/www/htdocs/demo_conception/pictures_uml/relation.ttl",
-            //         RDFFormat.TTL);
-
-            // log.debug("outputModelsupclasses exists: " + Helpers.isFileExists("/srv/www/htdocs/demo_conception/pictures_uml/subclasses.ttl"));
-            // log.debug("outputModelrelations exists: " + Helpers.isFileExists("/srv/www/htdocs/demo_conception/pictures_uml/relation.ttl"));
-            // log.debug("leaving CreateTxtFile.");
+            cModel.AppendLine("@enduml");
+            result.contentForUml = cModel.ToString();
+            return result;
         }
-        private int getKey(Dictionary<int, string> db, string value)
+        
+        
+        public HashSet<string> findSubclassAll(string aClass)
         {
-            foreach (int key in db.Keys)
-            {
-                if (db[key].Equals(value))
-                {
-                    return key; // return the first found
-                }
-            }
-            // return (Integer) null;
-            return default(int);
-        }
-
-        public HashSet<String> findSubclassAll(String c)
-        {
-            HashSet<String> sub = new HashSet<String>();
-            String superclass = "";
-            String requete1 = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + c
+            var subClasses = new HashSet<string>();
+            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + aClass
                     + "> rdfs:subClassOf* ?superClass . " + " } ";
-            var results1 = (SparqlResultSet)ds.ontology.ExecuteQuery(requete1);
-            foreach (var soln1 in results1)
+            var results = (SparqlResultSet)ds.ontology.ExecuteQuery(query);
+            foreach (var result in results)
             {
-                superclass = soln1["superClass"].ToString();
-                sub.Add(superclass);
+                var superclass = result["superClass"].ToString();
+                subClasses.Add(superclass);
             }
-            // Query q1 = QueryFactory.create(requete1);
-            // QueryExecution qexe1 = QueryExecutionFactory.create(q1, dbpOnt);
-            // ResultSet results1 = qexe1.execSelect();
-            // while (results1.hasNext())
-            // {
-            //     QuerySolution soln1 = results1.nextSolution();
-            //     superclass = soln1.get("?superClass").toString();
-            //     sub.Add(superclass);
-            // }
-            return sub;
+            return subClasses;
         }
-
-        public HashSet<String> findSubclass(String c)
+        public HashSet<string> findSubclass(string aClass)
         {
-            HashSet<String> sub = new HashSet<String>();
-            String superclass = "";
-            String requete1 = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + c
+            var subClasses = new HashSet<string>();
+            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " + "SELECT * WHERE { " + "<" + aClass
                     + "> rdfs:subClassOf ?superClass . " + " } ";
-            var results1 = (SparqlResultSet)ds.ontology.ExecuteQuery(requete1);
-            foreach (var soln1 in results1)
+            var results = (SparqlResultSet)ds.ontology.ExecuteQuery(query);
+            foreach (var result in results)
             {
-                superclass = soln1["superClass"].ToString();
-                sub.Add(superclass);
+                var superclass = result["superClass"].ToString();
+                subClasses.Add(superclass);
             }
-            // Query q1 = QueryFactory.create(requete1);
-            // QueryExecution qexe1 = QueryExecutionFactory.create(q1, dbpOnt);
-            // ResultSet results1 = qexe1.execSelect();
-            // while (results1.hasNext())
-            // {
-            //     QuerySolution soln1 = results1.nextSolution();
-            //     superclass = soln1.get("?superClass").toString();
-            //     sub.Add(superclass);
-            // }
-            return sub;
+            return subClasses;
         }
 
-        public async Task<string> FindDomain(String p3)
+        public enum RangeOrDomain
         {
-            Dictionary<String, int> typeMap = new Dictionary<String, int>();
-            var subjectsTmp = await ds.GetSubjects(p3, "");
-            // IteratorTripleString it = hdt.search("", p3, "");
-
-            // // We get all subjects of the wanted type first.
-            // HashSet<String> subjectsTmp = new HashSet<string>();
-            // while (it.hasNext())
-            // {
-            //     TripleString ts = it.next();
-            //     String s = ts.getSubject().toString();
-            //     subjectsTmp.Add(s);
-            // }
-            var predicatesBySubject = subjectsTmp.AsParallel().Select(subject =>
-            {
-                var setTmp = ds.GetObjects(subject, OntologyHelper.PropertyType).Result;
-                return new { subject, setTmp };
-            }).ToDictionary(x => x.subject, x => x.setTmp);
-            // subjectsTmp.parallelStream().forEach((subject)-> {
-            //     IteratorTripleString iter = null;
-            //     try
-            //     {
-            //         // TODO: adapt property if Wikidata is selected
-            //         iter = hdt.search(subject, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", "");
-            //     }
-            //     catch (NotFoundException e)
-            //     {
-            //         e.printStackTrace();
-            //     }
-            //     Set<String> setTmp = new HashSet<>();
-            //     while (iter.hasNext())
-            //     {
-            //         TripleString ts = iter.next();
-            //         String p = ts.getObject().toString();
-            //         setTmp.add(p);
-            //     }
-            //     predicatesBySubject.put(subject, setTmp);
-            // });
-            int big = 0;
-            int c = 0;
-            String ttt = "";
-            foreach (var entry in predicatesBySubject)//.entrySet())
-            {
-                var types = entry.Value.Where(x => x.Contains("dbpedia") &&
-                    !x.Contains("Wiki")).ToHashSet();
-                // Set<String> types = entry.getValue().stream().filter((t)->t.contains("dbpedia") && !t.contains("Wiki"))
-                //         .collect(Collectors.toSet());
-                foreach (String type in types)
-                {
-                    if (typeMap.ContainsKey(type))
-                    {
-                        c = typeMap.GetValueOrDefault(type);
-                        c++;
-                        typeMap.Add(type, c);
-                        if (big < c)
-                            big = c;
-                    }
-                    else
-                    {
-                        typeMap.Add(type, 1);
-                    }
-                }
-            }
-            var oo = new HashSet<object>();
-            oo = getKeyFromValue(typeMap, big);
-            foreach (Object obj in oo)
-                ttt = obj.ToString();
-            return ttt;
+            Range,
+            Domain
         }
 
-        public static HashSet<Object> getKeyFromValue(Dictionary<String, int> hm, Object value)
+        /// <summary>
+        /// If the range is not available within the ontology, we search for the
+        /// most used type among instances
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        public async Task<string> FindRangeOrDomain(string property, RangeOrDomain rangeOrDomain)
         {
-            var lo = new HashSet<Object>();
-            foreach (Object o in hm.Keys)
+            // get all objects being the range or domain of the given property
+            var objectsTmp = rangeOrDomain == RangeOrDomain.Range ?
+                await ds.GetObjects("", property) :
+                await ds.GetSubjects(property, "");
+            // getting all types for each object
+            var typesByObject = objectsTmp.AsParallel().Select(obj =>
             {
-                if (hm.GetValueOrDefault(o.ToString()).Equals(value))
-                {
-                    lo.Add(o);
-                }
-            }
-            return lo;
-        }
-
-        public async Task<String> FindRange(String p4)
-        {
-            var typeMap = new Dictionary<String, int>();
-            // IteratorTripleString it = hdt.search("", p4, "");
-            var objectsTmp = await ds.GetObjects("", p4);
-            // while (it.hasNext())
-            // {
-            //     TripleString ts = it.next();
-            //     String s = ts.getObject().toString();
-            //     objectsTmp.add(s);
-            // }
-            // final Map<String, Set< String >> predicatesByObject = new ConcurrentHashMap<>();
-            var predicatesBySubject = objectsTmp.AsParallel().Select(obj =>
-            {
-                var setTmp = ds.GetObjects(obj, OntologyHelper.PropertyType).Result;
+                var setTmp = ds.GetObjects(obj, ds.PropertyType).Result;
                 return new { subject = obj, setTmp };
             }).ToDictionary(x => x.subject, x => x.setTmp);
-            // objectsTmp.parallelStream().forEach((object) -> {
-            //     IteratorTripleString iter = null;
-            //     try
-            //     {
-            //         // TODO: adapt property if Wikidata is selected
-            //         iter = hdt.search(object, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", "");
-            //     }
-            //     catch (NotFoundException e)
-            //     {
-            //         e.printStackTrace();
-            //     }
-            //     Set<String> setTmp = new HashSet<>();
-            //     while (iter.hasNext())
-            //     {
-            //         TripleString ts = iter.next();
-            //         String p = ts.getObject().toString();
-            //         setTmp.add(p);
-            //     }
-            //     predicatesByObject.put(object, setTmp);
-            // });
 
-            int big = 0;
-            int c = 0;
-            String ttt = "";
-            foreach (var entry in predicatesBySubject)
+            var useCounter = 0;
+            var typeMap = new Dictionary<string, int>();
+            // computation of the most used type
+            foreach (var entry in typesByObject)
             {
-                var types = entry.Value.Where(x => x.Contains("dbpedia") &&
-                    !x.Contains("Wiki")).ToHashSet();
-                // Set<String> types = entry.getValue().stream().filter((t)->t.contains("dbpedia") && !t.contains("Wiki"))
-                //         .collect(Collectors.toSet());
-                foreach (String type in types)
+                var types = entry.Value.Where(x =>
+                    x.StartsWith(ds.OntologyNameSpace)).ToHashSet();
+
+                foreach (var type in types)
                 {
                     if (typeMap.ContainsKey(type))
                     {
-                        c = typeMap.GetValueOrDefault(type);
+                        var c = typeMap.GetValueOrDefault(type);
                         c++;
                         typeMap.Add(type, c);
-                        if (big < c)
-                            big = c;
+                        if (useCounter < c)
+                            useCounter = c;
                     }
                     else
                     {
@@ -558,11 +303,9 @@ namespace LOD_CM_CLI.Uml
                     }
                 }
             }
-            var oo = new HashSet<Object>();
-            oo = getKeyFromValue(typeMap, big);
-            foreach (Object obj in oo)
-                ttt = obj.ToString();
-            return ttt;
+            // return the most used type
+            return typeMap.Where(x => x.Value == useCounter)
+                .Select(x => x.Key).FirstOrDefault();
         }
 
     }

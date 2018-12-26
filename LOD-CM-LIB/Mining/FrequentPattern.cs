@@ -14,42 +14,8 @@ namespace LOD_CM_CLI.Mining
     /// </summary>
     public class FrequentPattern<T> where T : System.IComparable<T>
     {
-        /// <summary>
-        /// Frequent patterns
-        /// </summary>
-        AssociationRule<T>[] rulesFP;
-
+        public double minSupport { get; private set; }
         public ItemSets<T> fis { get; private set; }
-
-        public void GetFrequentPattern(T[][] transactions, double threshold)
-        {
-            if (threshold > 1)
-                throw new ArgumentException("Threshold must be between 0 and 1");
-            // t = s / tlength;
-            // t * tlengh = s;
-            var support = (int)Math.Floor(threshold * transactions.Length);
-            Console.WriteLine($"support: {support}");
-            Console.WriteLine("Mining...");
-            // Create a new A-priori learning algorithm with the requirements
-            var apriori = new Accord.MachineLearning.Rules.Apriori<T>(threshold: support, confidence: 0.7);
-            Console.WriteLine($"# apriori.Frequent: {apriori.Frequent.Count}");
-            // Use apriori to generate a n-itemset generation frequent pattern
-            var classifier = apriori.Learn(transactions);
-            Console.WriteLine($"# apriori.Frequent: {apriori.Frequent.Count}");
-
-            // Generate association rules from the itemsets:
-            rulesFP = classifier.Rules;
-            foreach (var rule in rulesFP)
-            {
-                // 1 5 6 7 #SUP: 67755
-                Console.WriteLine(string.Join(" ", rule.X) + " #SUP: " + rule.Support);
-            }
-            // Console.WriteLine("Maximum");
-            // foreach (var rule in GetMFP(rulesFP))
-            // {
-            //     Console.WriteLine(rule);
-            // }
-        }
         
         /// <summary>
         /// Return true if the FP is contained in the set (i.e.
@@ -62,17 +28,6 @@ namespace LOD_CM_CLI.Mining
         {
             if (!set.Any()) return (false, null);
             var setOfSet = currentFP.fis.Select(x => x.ToHashSet()).ToHashSet();
-            // var oldFP = set.Select(x =>
-            // {
-            //     var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
-            //     return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y))) ?
-            //         currentFP : null;
-            // }).FirstOrDefault();
-            // // var res = set.Any(x =>
-            // // {
-            // //     var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
-            // //     return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y)));
-            // // });
             var oldFP = set.FirstOrDefault(x =>
             {
                 var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
@@ -81,14 +36,19 @@ namespace LOD_CM_CLI.Mining
             return (oldFP != null, oldFP);  
         }
 
+        /// <summary>
+        /// Save FP in given file. The pattern is:
+        /// properties #SUP: transactionsCounter
+        /// </summary>
+        /// <param name="fpFilePath"></param>
+        /// <returns></returns>
+        /// <example>1 3 5 6 #SUP: 2345</example>
         public async Task SaveFP(string fpFilePath)
         {
             await File.WriteAllLinesAsync(fpFilePath,
                 fis.Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
             );
         }
-
-        public double minSupport { get; private set; }
 
         public PatternDiscovery.ItemSets<T> GetFrequentPatternV2(
             List<PatternDiscovery.Transaction<T>> transactions,
@@ -126,27 +86,18 @@ namespace LOD_CM_CLI.Mining
             #endregion
             return fis;
         }
-
+                
         /// <summary>
         /// Return all Maximum Frequent Pattern from a Frequent Pattern list.
         /// </summary>
         /// <param name="rules"></param>
         /// <returns></returns>
-        public IEnumerable<AssociationRule<T>> GetMFP(
-            IEnumerable<AssociationRule<T>> rules)
-        {
-            foreach (var rule in rules)
-            {
-                if (IsMFP(rule, rules))
-                    yield return rule;
-            }
-        }
-        public IEnumerable<HashSet<T>> GetMFPV2(
+        public IEnumerable<HashSet<T>> GetMFP(
             HashSet<HashSet<T>> fis)
         {
             foreach (var rule in fis)
             {
-                if (IsMFPV2(rule, fis))
+                if (IsMFP(rule, fis))
                     yield return rule;
             }
         }
@@ -157,16 +108,10 @@ namespace LOD_CM_CLI.Mining
         /// <param name="rule"></param>
         /// <param name="rules"></param>
         /// <returns></returns>
-        public bool IsMFP(AssociationRule<T> rule,
-            IEnumerable<AssociationRule<T>> rules)
-        {
-            return !rules.Select(x => x.X).Any(x => x.IsProperSupersetOf(rule.X));
-        }
-        public bool IsMFPV2(HashSet<T> rule,
+        public bool IsMFP(HashSet<T> rule,
             HashSet<HashSet<T>> fis)
         {
             return !fis.Any(x => x.IsProperSupersetOf(rule));
-            // throw new NotImplementedException();
         }
 
     }

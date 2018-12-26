@@ -21,6 +21,18 @@ namespace LOD_CM_CLI.Data
         /// <value></value>
         public bool IsOpen { get; private set; }
 
+        /// <summary>
+        /// Used to search type of an instance within data (not in ontology).
+        /// </summary>
+        /// <value></value>
+        /// <example>With DBpedia its is rdf:type, with Wikidata its is P31</example>
+        public string PropertyType { get; set; }
+        /// <summary>
+        /// For Dbpedia: http://dbpedia.org/ontology/
+        /// </summary>
+        /// <value></value>
+        public string OntologyNameSpace { get; set; }
+
         private HDT hdt;
         public string hdtFilePath { get; set; }
         public string ontologyFilePath { get; set; }

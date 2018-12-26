@@ -23,6 +23,10 @@ namespace LOD_CM_CLI.Mining
         /// <param name="transactionsFilePath"></param>
         /// <param name="dictionaryFilePath"></param>
         /// <returns></returns>
+        /// <example>For transactions: 
+        /// 2 4 5 6 9 23</example>
+        /// <example>For dictionary:
+        /// 4 http://dbpedia.org/ontology/director</example>
         public async Task SaveToFiles(
             string transactionsFilePath,
             string dictionaryFilePath)
