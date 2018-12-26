@@ -51,7 +51,7 @@ namespace LOD_CM_CLI
 
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
-            log.LogInformation("Precomputation...");            
+            log.LogInformation("Precomputation...");
             await dataset.Precomputation();
             log.LogInformation("Getting classes...");
             var classes = await dataset.GetInstanceClasses();
@@ -67,7 +67,7 @@ namespace LOD_CM_CLI
                 log.LogInformation($"class: {instanceClass.Label} ({count++}/{total})");
                 // var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
                 var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
-
+                log.LogDebug($"transactions computed: {transactions.transactions.Count}");
                 // ex: ${workingdirectory}/DBpedia/Film
                 var instancePath = Path.Combine(
                     mainDirectory,
@@ -139,7 +139,7 @@ namespace LOD_CM_CLI
                 }
 
             }
-
+            );
 
         }
         public static string ToPrettyFormat(TimeSpan span)
