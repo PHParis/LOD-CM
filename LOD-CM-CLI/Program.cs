@@ -60,11 +60,13 @@ namespace LOD_CM_CLI
             log.LogInformation("Looping on classes...");
             var count = 1;
             // TODO: parellize this loop
-            foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+            // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+            Parallel.ForEach(classes, instanceClass =>
             // foreach (var instanceClass in classes)
             {
                 log.LogInformation($"class: {instanceClass.Label} ({count++}/{total})");
-                var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
+                // var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
+                var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
 
                 // ex: ${workingdirectory}/DBpedia/Film
                 var instancePath = Path.Combine(
@@ -73,15 +75,20 @@ namespace LOD_CM_CLI
                     instanceClass.Label
                 );
                 Directory.CreateDirectory(instancePath);
-                await transactions.SaveToFiles(
+                // await transactions.SaveToFiles(
+                //     Path.Combine(instancePath, "transactions.txt"),
+                //     Path.Combine(instancePath, "dictionary.txt")
+                // );
+                transactions.SaveToFiles(
                     Path.Combine(instancePath, "transactions.txt"),
                     Path.Combine(instancePath, "dictionary.txt")
-                );
+                ).RunSynchronously();
 
                 var fpSet = new List<FrequentPattern<int>>();
 
                 // TODO: put back enumeration over range
-                foreach (var thresholdInt in new[] {80})//Enumerable.Range(1, 100))
+                // foreach (var thresholdInt in new[] {80})//Enumerable.Range(1, 100))
+                foreach (var thresholdInt in Enumerable.Range(50, 100))
                 {
                     var threshold = thresholdInt / 100d;
 
@@ -109,18 +116,24 @@ namespace LOD_CM_CLI
                     else
                     {
                         fpSet.Add(fp);
-                        await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
+                        // await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
+                        fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).RunSynchronously();
 
-                        var igs = await ImageGenerator.GenerateTxtForUml(dataset,
-                            instanceClass, threshold, fp);
+                        // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
+                        //     instanceClass, threshold, fp);
+                        var igs = ImageGenerator.GenerateTxtForUml(dataset,
+                            instanceClass, threshold, fp).Result;
 
                         var counter = 0;
                         foreach (var ig in igs)
                         {
-                            await ig.GetImageContent();
                             counter++;
-                            await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
-                            await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
+                            // await ig.GetImageContent();
+                            // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
+                            // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
+                            ig.GetImageContent().RunSynchronously();
+                            ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).RunSynchronously();
+                            ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).RunSynchronously();
                         }
                     }
                 }
