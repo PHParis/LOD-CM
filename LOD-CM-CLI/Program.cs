@@ -29,17 +29,21 @@ namespace LOD_CM_CLI
         {
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
+            var configContent = await File.ReadAllLinesAsync(args[1]);
+            var dsHdt = configContent[0]; // Path.Combine(@"E:\download", "dataset.hdt")
+            var dsOnto = configContent[1];// Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt")
+            var dsLabel = configContent[2]; // DBpedia
+            var dsPropertyType = configContent[3]; // OntologyHelper.PropertyType;
+            var dsOntologyNameSpace = configContent[4]; // "http://dbpedia.org/ontology/"
+            var mainDir = configContent[5]; // @"E:\download"
             var sw = Stopwatch.StartNew();
-            using (var ds = await Dataset.Create(
-                    Path.Combine(@"E:\download", "dataset.hdt"),
-                    Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt"),
-                    serviceProvider)
+            using (var ds = await Dataset.Create(dsHdt, dsOnto, serviceProvider)
                 .LoadHdt())//.LoadHdt() await
             {
-                ds.Label = "DBpedia";
-                ds.PropertyType = OntologyHelper.PropertyType;
-                ds.OntologyNameSpace = "http://dbpedia.org/ontology/";
-                await ComputeFpMfpImage(ds, @"E:\download");
+                ds.Label = dsLabel;
+                ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
+                ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
+                await ComputeFpMfpImage(ds, mainDir);
             }
             sw.Stop();
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
