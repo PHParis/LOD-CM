@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using HDTDotnet;
+using VDS.RDF.Query;
 using VDS.RDF;
 using VDS.RDF.Ontology;
 using VDS.RDF.Parsing;
@@ -64,6 +65,9 @@ namespace LOD_CM_CLI.Data
             // we just check if an ontology file is provided
             this.IsOntologyAvailable = ontologyFilePath != null &&
                 File.Exists(ontologyFilePath);
+            objectProperties = new Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)>();
+            dataTypeProperties = new Dictionary<string, string>();
+            // objectPropertiesRange = new Dictionary<string, HashSet<string>>();
         }
 
         /// <summary>
@@ -152,5 +156,197 @@ namespace LOD_CM_CLI.Data
                 .Select(x => x.getObject()).ToHashSet();
             return classUris.Select(x => new InstanceClass(x));
         }
+
+
+        public async Task Precomputation()
+        {            
+            // TODO: add logger everywhere 
+            var properties = ontology.Triples.Where(x => 
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
+                x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty)||
+                x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
+                .Select(x => x.Subject.ToString()).Distinct().ToList();
+            Console.WriteLine($"# properties: {properties.Count}");
+            foreach (var property in properties)
+            {
+                await GetPropertyDomainRangeOrDataType(property);
+            }
+            Console.WriteLine($"classes...");
+            superClassesOfClass = new Dictionary<string, HashSet<string>>();
+            var classes = ontology.Triples.Where(x => 
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
+                x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
+                .Select(x => x.Subject.ToString()).Distinct().ToList();
+            Console.WriteLine($"# classes: {classes.Count}");
+            foreach (var @class in classes)
+            {
+                var set = FindSuperClasses(@class, Level.First);
+                superClassesOfClass[@class] = set;
+            }
+            Console.WriteLine($"classes done");
+        }
+
+        /// <summary>
+        /// Return one subclass if level is set to First, and
+        /// all super classes if level is set to all.
+        /// </summary>
+        /// <param name="aClass"></param>
+        /// <param name="level"></param>
+        /// <returns></returns>
+        public HashSet<string> FindSuperClasses(string aClass, Level level)
+        {
+            var multipleLevels = level == Level.All ? "*" : string.Empty;
+            var query = @"
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+                SELECT * WHERE { 
+                    <" + aClass + @"> rdfs:subClassOf" + multipleLevels + @" ?superClass . 
+                }";
+            var results = (SparqlResultSet)ontology.ExecuteQuery(query);
+            var subClasses = new HashSet<string>();
+            foreach (var result in results)
+            {
+                var superclass = result["superClass"].ToString();
+                subClasses.Add(superclass);
+            }
+            return subClasses;
+        }
+
+        /// <summary>
+        /// The key is the property uri, the value are its domain(s) and range(s) and the dash
+        /// </summary>
+        /// <value></value>
+        public Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)> objectProperties{get;private set;}
+        // public Dictionary<string, HashSet<string>> objectPropertiesRange {get;private set;}
+        /// <summary>
+        /// The key is the property uri, the value is its datatype
+        /// </summary>
+        /// <value></value>
+        public Dictionary<string, string> dataTypeProperties {get;private set;}
+
+        public async Task GetPropertyDomainRangeOrDataType(string propertyUri)
+        {
+            if (string.IsNullOrWhiteSpace(propertyUri)) return;
+            var propNode = ontology.GetUriNode(
+                new Uri(propertyUri));            
+            var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
+            var owlObjectProp = ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
+            if (ontology.ContainsTriple(
+                new Triple(propNode, rdfType, owlObjectProp)))
+            {
+                // it is an object property
+                var domainsAndRanges = await GetPropertyDomainRange(propertyUri);
+                objectProperties[propertyUri] = domainsAndRanges;
+                // objectPropertiesDomain.Add(propertyUri, domainsAndRanges.domains);
+                // objectPropertiesRange.Add(propertyUri, domainsAndRanges.ranges);
+            }
+            else
+            {
+                // it is NOT an object property
+                var dataType = GetPropertyDataType(propertyUri);
+                if (!string.IsNullOrWhiteSpace(dataType))
+                    dataTypeProperties[propertyUri] = dataType;
+            }
+        }
+
+        private async Task<(HashSet<string> domains, HashSet<string> ranges, bool dash)> GetPropertyDomainRange(string propertyUri)
+        {
+            var domains = ontology.Triples.Where(x =>
+                x.Subject.ToString().Equals(propertyUri) &&
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyDomain))
+                .Select(x => x.Object.ToString())
+                .ToHashSet();
+
+
+            var ranges = ontology.Triples.Where(x =>
+                x.Subject.ToString().Equals(propertyUri) &&
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
+                .Select(x => x.Object.ToString())
+                .ToHashSet();
+            var dash = false;
+            if (!domains.Any())
+            {
+                domains.Add(await FindRangeOrDomain(propertyUri, RangeOrDomain.Domain));
+                dash = true;
+            }
+            if (!ranges.Any())
+            {
+                ranges.Add(await FindRangeOrDomain(propertyUri, RangeOrDomain.Range));
+                dash = true;
+            }
+
+            return (domains, ranges, dash);
+        }
+
+        private string GetPropertyDataType(string dtp)
+        {
+            return ontology.Triples.Where(x =>
+                x.Subject.ToString().Equals(dtp) &&
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
+                .Select(x => x.Object.ToString())
+                .FirstOrDefault();
+        }         
+
+
+        /// <summary>
+        /// If the range is not available within the ontology, we search for the
+        /// most used type among instances
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        public async Task<string> FindRangeOrDomain(string property, RangeOrDomain rangeOrDomain)
+        {
+            // get all objects being the range or domain of the given property
+            var objectsTmp = rangeOrDomain == RangeOrDomain.Range ?
+                await GetObjects("", property) :
+                await GetSubjects(property, "");
+            // getting all types for each object
+            var typesByObject = objectsTmp.AsParallel().Select(obj =>
+            {
+                var setTmp = GetObjects(obj, PropertyType).Result;
+                return new { subject = obj, setTmp };
+            }).ToDictionary(x => x.subject, x => x.setTmp);
+
+            var useCounter = 0;
+            var typeMap = new Dictionary<string, int>();
+            // computation of the most used type
+            foreach (var entry in typesByObject)
+            {
+                var types = entry.Value.Where(x =>
+                    x.StartsWith(OntologyNameSpace)).ToHashSet();
+
+                foreach (var type in types)
+                {
+                    if (typeMap.ContainsKey(type))
+                    {
+                        var c = typeMap.GetValueOrDefault(type);
+                        c++;
+                        typeMap[type] = c;
+                        if (useCounter < c)
+                            useCounter = c;
+                    }
+                    else
+                    {
+                        typeMap[type] = 1;
+                    }
+                }
+            }
+            // return the most used type
+            return typeMap.Where(x => x.Value == useCounter)
+                .Select(x => x.Key).FirstOrDefault();
+        }
+        public enum Level
+        {
+            First,
+            All
+        }        
+        public enum RangeOrDomain
+        {
+            Range,
+            Domain
+        }
+        public Dictionary<string, HashSet<string>> superClassesOfClass {get; private set;}
+
     }
 }

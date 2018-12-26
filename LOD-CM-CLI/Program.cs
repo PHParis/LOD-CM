@@ -41,6 +41,8 @@ namespace LOD_CM_CLI
 
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
+            Console.WriteLine("Precomputation...");            
+            await dataset.Precomputation();
             Console.WriteLine("Getting classes...");
             var classes = await dataset.GetInstanceClasses();
             var total = classes.Count();
@@ -99,12 +101,18 @@ namespace LOD_CM_CLI
                         fpSet.Add(fp);
                         await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
 
-                        var ig = await ImageGenerator.GenerateTxtForUml(dataset,
-                            instanceClass, threshold, fp.fis, transactions);
+                        var igs = await ImageGenerator.GenerateTxtForUml(dataset,
+                            instanceClass, threshold, fp);
 
-                        await ig.GetImageContent();
-                        await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, "plant.txt"));
-                        await ig.SaveImage(Path.Combine(imageFilePath, "img.svg"));
+                        var counter = 0;
+                        foreach (var ig in igs)
+                        {
+                            // TODO: adapt names with counter or something like that
+                            await ig.GetImageContent();
+                            counter++;
+                            await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
+                            await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
+                        }
                     }
                 }
 

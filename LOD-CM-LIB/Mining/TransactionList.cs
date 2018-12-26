@@ -13,10 +13,12 @@ namespace LOD_CM_CLI.Mining
         public List<T> domain { get; private set; }
         public Dictionary<string, T> predicateToIntDict { get; private set; }
         public Dictionary<T, string> intToPredicateDict { get; private set; }
+        public Dataset dataset { get; private set; }
 
         private TransactionList() {}
 
         public List<Transaction<T>> transactions { get; private set; }
+        
 
         /// <summary>
         /// Save transactions and dictionary to given file paths
@@ -53,6 +55,7 @@ namespace LOD_CM_CLI.Mining
             result.predicateToIntDict = new Dictionary<string, T>();
             result.intToPredicateDict = new Dictionary<T, string>();
             result.transactions = new List<Transaction<T>>();
+            result.dataset = dataset;
             foreach (var instance in instances)
             {
                 var predicates = await dataset.GetPredicates(instance);
@@ -69,8 +72,8 @@ namespace LOD_CM_CLI.Mining
                     {
                         // FIXME: following line works only if T is of a number type... Thus, it's not real generic class...
                         predicateId = (T)Convert.ChangeType(result.predicateToIntDict.Count + 1, typeof(T));
-                        result.predicateToIntDict.Add(predicate, predicateId);
-                        result.intToPredicateDict.Add(predicateId, predicate);
+                        result.predicateToIntDict[predicate] = predicateId;
+                        result.intToPredicateDict[predicateId] = predicate;
                     }
                     currentTransaction.Add(predicateId);
                 }
@@ -79,5 +82,8 @@ namespace LOD_CM_CLI.Mining
             result.domain = result.intToPredicateDict.Select(x => x.Key).ToList();
             return result;
         }
+
+
+        
     }
 }

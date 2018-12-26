@@ -14,8 +14,10 @@ namespace LOD_CM_CLI.Mining
     /// </summary>
     public class FrequentPattern<T> where T : System.IComparable<T>, IConvertible
     {
+        public TransactionList<T> transactions {get;private set;}
         public double minSupport { get; private set; }
         public ItemSets<T> fis { get; private set; }
+        
         
         /// <summary>
         /// Return true if the FP is contained in the set (i.e.
@@ -55,7 +57,9 @@ namespace LOD_CM_CLI.Mining
         {
             if (minSupport > 1)
                 throw new ArgumentException("Threshold must be between 0 and 1");
+            this.transactions = transactions;
             this.minSupport = minSupport;
+            // this.objectPropertiesInfo = new List<(HashSet<string> classes, int propertySupport, bool dash)>();
             var domain = transactions.domain;
             Console.WriteLine("Mining...");
             var method = new PatternDiscovery.FrequentPatterns.Apriori<T>();
@@ -103,6 +107,6 @@ namespace LOD_CM_CLI.Mining
         {
             return !fis.Any(x => x.IsProperSupersetOf(rule));
         }
-
+        
     }
 }
