@@ -4,18 +4,19 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using LOD_CM_CLI.Data;
+using PatternDiscovery;
 
 namespace LOD_CM_CLI.Mining
 {
-    public class Transaction
+    public class TransactionList<T> where T : IComparable<T>, IConvertible
     {
-        public List<int> domain { get; private set; }
-        public Dictionary<string, int> predicateToIntDict { get; private set; }
-        public Dictionary<int, string> intToPredicateDict { get; private set; }
+        public List<T> domain { get; private set; }
+        public Dictionary<string, T> predicateToIntDict { get; private set; }
+        public Dictionary<T, string> intToPredicateDict { get; private set; }
 
-        private Transaction() {}
+        private TransactionList() {}
 
-        public List<HashSet<int>> transactions { get; private set; }
+        public List<Transaction<T>> transactions { get; private set; }
 
         /// <summary>
         /// Save transactions and dictionary to given file paths
@@ -43,36 +44,37 @@ namespace LOD_CM_CLI.Mining
         /// </summary>
         /// <param name="dataset"></param>
         /// <returns></returns>
-        public static async Task<Transaction> GetTransactions(Dataset dataset, InstanceClass instanceClass)
+        public static async Task<TransactionList<T>> GetTransactions(Dataset dataset, InstanceClass instanceClass)
         {
-            var result = new Transaction();
+            var result = new TransactionList<T>();
             if (!dataset.IsOpen)
                 await dataset.LoadHdt();
             var instances = await dataset.GetInstances(instanceClass);
-            result.predicateToIntDict = new Dictionary<string, int>();
-            result.intToPredicateDict = new Dictionary<int, string>();
-            result.transactions = new List<HashSet<int>>();
+            result.predicateToIntDict = new Dictionary<string, T>();
+            result.intToPredicateDict = new Dictionary<T, string>();
+            result.transactions = new List<Transaction<T>>();
             foreach (var instance in instances)
             {
                 var predicates = await dataset.GetPredicates(instance);
                 // transaction of the given instance
-                var currentTransaction = new HashSet<int>();
+                var currentTransaction = new HashSet<T>();
                 foreach (var predicate in predicates)
                 {
-                    int predicateId;
+                    T predicateId;
                     if (result.predicateToIntDict.ContainsKey(predicate))
                     {
                         predicateId = result.predicateToIntDict[predicate];
                     }
                     else
                     {
-                        predicateId = result.predicateToIntDict.Count + 1;
+                        // FIXME: following line works only if T is of a number type... Thus, it's not real generic class...
+                        predicateId = (T)Convert.ChangeType(result.predicateToIntDict.Count + 1, typeof(T));
                         result.predicateToIntDict.Add(predicate, predicateId);
                         result.intToPredicateDict.Add(predicateId, predicate);
                     }
                     currentTransaction.Add(predicateId);
                 }
-                result.transactions.Add(currentTransaction);
+                result.transactions.Add(new Transaction<T>(currentTransaction.ToArray()));
             }
             result.domain = result.intToPredicateDict.Select(x => x.Key).ToList();
             return result;

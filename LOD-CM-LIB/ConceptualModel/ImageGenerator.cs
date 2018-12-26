@@ -65,7 +65,7 @@ namespace LOD_CM_CLI.Uml
 
         public static async Task<ImageGenerator> GenerateTxtForUml(Dataset ds,
             InstanceClass instanceClass, double threshold,
-            PatternDiscovery.ItemSets<int> mfps, Mining.Transaction transactions)
+            PatternDiscovery.ItemSets<int> mfps, Mining.TransactionList<int> transactions)
         {
             var result = new ImageGenerator();
             result.ds = ds;
@@ -77,12 +77,21 @@ namespace LOD_CM_CLI.Uml
             cModel.AppendLine("skinparam linetype ortho");
 
             var thresholdInt = Convert.ToInt32(threshold * 100);
-            foreach (var line in mfps)
-            {
-                var currentSupportInt = Convert.ToInt32(line.Support * 100);
-                if (line.Count == 1 && thresholdInt <= currentSupportInt) // TODO: but why take only line with only one property
-                    result.propertyMinsup.Add(line[0], currentSupportInt);
-            }
+            // var maximalSets = mfps.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
+            //     .ThenByDescending(x => x.TransactionCount).ToList();
+            // var properties = maximalSets.SelectMany(x => x).ToHashSet();
+            var selectedLine = mfps.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
+                .ThenByDescending(x => x.TransactionCount)
+                // .Select(x => new {itemSet = x, support = Convert.ToInt32(x.Support * 100)})
+                .FirstOrDefault(); // TODO: loop on all mfp and create coresponding images
+            result.propertyMinsup = selectedLine.ToDictionary(x => x, 
+                x => Convert.ToInt32(selectedLine.Support * 100));
+            // foreach (var line in mfps)// TODO: use real MFP here.
+            // {
+            //     var currentSupportInt = Convert.ToInt32(line.Support * 100);
+            //     if (line.Count == 1 && thresholdInt <= currentSupportInt) // TODO: but why take only line with only one property
+            //         result.propertyMinsup.Add(line[0], currentSupportInt);
+            // }
 
             var rdfType = ds.ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
             var owlObjectProp = ds.ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
@@ -96,8 +105,7 @@ namespace LOD_CM_CLI.Uml
             var notObjectProperties = result.propertyMinsup.Select(p => transactions.intToPredicateDict[p.Key])
                 .Except(objectProperties).ToList();
 
-            var classes = new HashSet<string>();
-            classes.Add(instanceClass.Uri);
+            var classes = new HashSet<string> { instanceClass.Uri };
             // we search domain and range for each object property
             // to iteratively create the class diagram
             foreach (var op in objectProperties)
@@ -209,7 +217,7 @@ namespace LOD_CM_CLI.Uml
             return result;
         }
 
-        
+
         public enum Level
         {
             First,

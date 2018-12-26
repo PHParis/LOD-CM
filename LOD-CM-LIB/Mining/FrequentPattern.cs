@@ -12,7 +12,7 @@ namespace LOD_CM_CLI.Mining
     /// <summary>
     /// Allow to compute Frequent patterns of a given dataset (https://github.com/cschen1205/cs-pattern-discovery)
     /// </summary>
-    public class FrequentPattern<T> where T : System.IComparable<T>
+    public class FrequentPattern<T> where T : System.IComparable<T>, IConvertible
     {
         public double minSupport { get; private set; }
         public ItemSets<T> fis { get; private set; }
@@ -51,25 +51,15 @@ namespace LOD_CM_CLI.Mining
         }
 
         public PatternDiscovery.ItemSets<T> GetFrequentPatternV2(
-            List<PatternDiscovery.Transaction<T>> transactions,
-            double minSupport,
-            List<T> domain)
+            TransactionList<T> transactions, double minSupport)
         {
             if (minSupport > 1)
                 throw new ArgumentException("Threshold must be between 0 and 1");
             this.minSupport = minSupport;
-            // t = s / tlength;
-            // t * tlengh = s;
-            // var support = (int)Math.Floor(threshold * transactions.Count);
-            // Console.WriteLine($"support: {support}");
+            var domain = transactions.domain;
             Console.WriteLine("Mining...");
-            // var method = new FPGrowth<T>();
-            // var fis = method.MinePatterns(transactions, 
-            //     PatternDiscovery.Transaction<T>.ExtractDomain(transactions), minSupport);
             var method = new PatternDiscovery.FrequentPatterns.Apriori<T>();
-            fis = method.MinePatterns(transactions, minSupport, domain);
-            // var firstFis = fis.First();
-            // var firstFisSet = firstFis.ToHashSet(); 
+            fis = method.MinePatterns(transactions.transactions, minSupport, domain);
             #region MFP
             // var fisSet = fis.Select(x => x.ToHashSet()).ToHashSet();  
             // for (int i = 0; i < fis.Count; ++i)

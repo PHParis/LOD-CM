@@ -48,18 +48,11 @@ namespace LOD_CM_CLI
             Console.WriteLine("Looping on classes...");
             var count = 1;
             // TODO: parellize this loop
-            foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+            // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+            foreach (var instanceClass in classes)
             {
                 Console.WriteLine($"class: {instanceClass.Label} ({count++}/{total})");
-                var transactions = await Transaction.GetTransactions(dataset, instanceClass);
-
-                long baseId = 0;
-                var transactionPatternDiscovery = transactions.transactions.Select(x =>
-                    new PatternDiscovery.Transaction<int>(x.ToArray())
-                    {
-                        ID = baseId++
-                    }
-                ).ToList();
+                var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
 
                 // ex: ${workingdirectory}/DBpedia/Film
                 var instancePath = Path.Combine(
@@ -81,9 +74,8 @@ namespace LOD_CM_CLI
                     var threshold = thresholdInt / 100d;
 
                     var fp = new FrequentPattern<int>();
-                    fp.GetFrequentPatternV2(transactionPatternDiscovery, threshold, transactions.domain);
-                    // previousFP.GetMFPV2()
-                    // TODO: compute MFP here. We don't use FP anymore
+                    fp.GetFrequentPatternV2(transactions, threshold);
+                    fp.ComputeMFP();
 
                     var imageFilePath = Path.Combine(
                         instancePath,
@@ -107,7 +99,6 @@ namespace LOD_CM_CLI
                         fpSet.Add(fp);
                         await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
 
-                        // var ig = new ImageGenerator(dataset);
                         var ig = await ImageGenerator.GenerateTxtForUml(dataset,
                             instanceClass, threshold, fp.fis, transactions);
 
