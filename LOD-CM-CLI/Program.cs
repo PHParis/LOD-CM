@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -80,9 +81,9 @@ namespace LOD_CM_CLI
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(jsonDatasetPath, json);
             }
-            if (!dataset.dataTypeProperties.Any() || 
-                !dataset.objectProperties.Any() || 
-                !dataset.superClassesOfClass.Any() || 
+            if (!dataset.dataTypeProperties.Any() ||
+                !dataset.objectProperties.Any() ||
+                !dataset.superClassesOfClass.Any() ||
                 !dataset.classesDepths.Any())
                 throw new Exception(@"Something went wrong during precomputation.
                     One of the dataset property is empty!");
@@ -108,7 +109,9 @@ namespace LOD_CM_CLI
             log.LogInformation($"# classes: {total}");
             log.LogInformation("Looping on classes...");
             var count = 0;
-
+            // this will be used after the parallel loop to re-download 
+            // images when a problems occurred
+            var failedContentForUmlPath = new ConcurrentBag<string>();
             Parallel.ForEach(classes, instanceClass =>
             {
                 Interlocked.Increment(ref count);
@@ -152,18 +155,49 @@ namespace LOD_CM_CLI
                     foreach (var ig in igs)
                     {
                         counter++;
+                        // we save the content sended to PlantUML, thus if
+                        // a problem occurs, we will be able to regenerate
+                        // images.
+                        ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
                         var isDownloadOK = ig.GetImageContent().Result;
                         if (isDownloadOK)
                         {
-                            ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
                             ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
+                        }
+                        else
+                        {
+                            failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         }
                     }
                 }
             }
             );
-
+            log.LogInformation("main loop ended!");
+            // after the loop we search for images not generated to generate them
+            log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
+            var finalErrors = new List<string>();
+            foreach (var contentPath in failedContentForUmlPath)
+            {
+                try
+                {
+                    var contentForUml = await File.ReadAllTextAsync(contentPath);
+                    var svgFileContent = await ImageGenerator.GetImageContent(contentForUml);
+                    var filePath = contentPath.Replace("plant_", "img_").Replace(".txt", ".svg");
+                    await File.WriteAllTextAsync(filePath, svgFileContent);
+                }
+                catch (Exception ex)
+                {
+                    finalErrors.Add(contentPath);
+                    log.LogError($"{ex}");
+                }
+            }
+            await File.WriteAllLinesAsync(Path.Combine(
+                mainDirectory,
+                dataset.Label,
+                "imagesInError.txt"
+            ), finalErrors);
         }
+
         public static string ToPrettyFormat(TimeSpan span)
         {
 

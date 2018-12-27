@@ -59,18 +59,24 @@ namespace LOD_CM_CLI.Uml
         {
             try
             {
-                var uri = PlantUMLUrl.SVG(contentForUml);
-                using (var client = new HttpClient())
-                {
-                    svgFileContent = await client.GetStringAsync(uri);
-                }
-                return true;
+                svgFileContent = await GetImageContent(contentForUml);
             }
             catch (Exception ex)
             {
                 log.LogError($"{fp.transactions.instanceClass.Label} ({fp.minSupport}): {ex.Message}");
             }
             return false;
+        }
+
+        public static async Task<string> GetImageContent(string contentForUml)
+        {
+            var uri = PlantUMLUrl.SVG(contentForUml);
+            string svgFileContent;
+            using (var client = new HttpClient())
+            {
+                svgFileContent = await client.GetStringAsync(uri);
+            }
+            return svgFileContent;
         }
 
         public async Task SaveImage(string filePath)
@@ -119,13 +125,6 @@ namespace LOD_CM_CLI.Uml
             InstanceClass instanceClass, double threshold,
             FrequentPattern<int> fp, ServiceProvider serviceProvider)
         {
-            // result.propertyMinsup = new Dictionary<int, int>();
-
-            // var cModel = new StringBuilder();
-
-            // cModel.AppendLine("@startuml");
-            // cModel.AppendLine("skinparam linetype ortho");
-
             var thresholdInt = Convert.ToInt32(threshold * 100);
             var maximalSets = fp.fis.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
                 .ThenByDescending(x => x.TransactionCount).ToList();
@@ -216,161 +215,6 @@ namespace LOD_CM_CLI.Uml
                 result.contentForUml = cModel.ToString();
             }
             return finalResults;
-            // #region To do before this function!
-            // var properties = maximalSets.SelectMany(x => x).ToHashSet();
-            // var rangeDomainClasses = new HashSet<string>(); // TODO: fill it with folowing loop
-            // foreach (var property in properties)
-            // {
-            //     // var tmp = GetPropertyDomainRangeOrDataType(property);
-            //     throw new NotImplementedException();
-            // }
-            // result.superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            // foreach (var @class in rangeDomainClasses)
-            // {
-            //     if (!result.superClassesOfClass.ContainsKey(@class))
-            //     {
-            //         var set = result.FindSuperClasses(@class, Level.First);
-            //         result.superClassesOfClass.Add(@class, set);
-            //     }
-            // }
-            // #endregion
-            // // computation of super classes etc.
-            // // creations of models for each mfp in maximalSets
-            // var selectedLine = mfps.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
-            //     .ThenByDescending(x => x.TransactionCount)
-            //     // .Select(x => new {itemSet = x, support = Convert.ToInt32(x.Support * 100)})
-            //     .FirstOrDefault(); // TODO: loop on all mfp and create coresponding images
-            // result.propertyMinsup = selectedLine.ToDictionary(x => x,
-            //     x => Convert.ToInt32(selectedLine.Support * 100));
-            // // foreach (var line in mfps)// TODO: use real MFP here.
-            // // {
-            // //     var currentSupportInt = Convert.ToInt32(line.Support * 100);
-            // //     if (line.Count == 1 && thresholdInt <= currentSupportInt) // TODO: but why take only line with only one property
-            // //         result.propertyMinsup.Add(line[0], currentSupportInt);
-            // // }
-
-            // var rdfType = ds.ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
-            // var owlObjectProp = ds.ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
-            // // in this loop we check for each property, if it is an
-            // // object property or not
-            // var objectProperties = result.propertyMinsup.Select(p =>
-            //     ds.ontology.GetUriNode(new Uri(transactions.intToPredicateDict[p.Key])))
-            //     .Where(p => p != null).Where(p => ds.ontology.ContainsTriple(
-            //         new Triple(p, rdfType, owlObjectProp)))
-            //         .Select(x => x.Uri.AbsoluteUri).ToList();
-            // var notObjectProperties = result.propertyMinsup.Select(p => transactions.intToPredicateDict[p.Key])
-            //     .Except(objectProperties).ToList();
-
-            // var classes = new HashSet<string> { instanceClass.Uri };
-            // // we search domain and range for each object property
-            // // to iteratively create the class diagram
-            // foreach (var op in objectProperties)
-            // {
-
-            //     var opIndex = transactions.predicateToIntDict[op];
-            //     var propertySupport = result.propertyMinsup.GetValueOrDefault(opIndex);
-
-            //     var domain = ds.ontology.Triples.Where(x =>
-            //         x.Subject.ToString().Equals(op) &&
-            //         x.Predicate.ToString().Equals(OntologyHelper.PropertyDomain))
-            //         .Select(x => x.Object.ToString())
-            //         .FirstOrDefault();
-
-
-            //     var range = ds.ontology.Triples.Where(x =>
-            //         x.Subject.ToString().Equals(op) &&
-            //         x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
-            //         .Select(x => x.Object.ToString())
-            //         .FirstOrDefault();
-
-            //     string dd;
-            //     string rr;
-            //     var dash = false;
-
-            //     if (domain == null)
-            //     {
-            //         dd = await result.FindRangeOrDomain(op, RangeOrDomain.Domain);
-            //         classes.Add(dd);
-            //         dash = true;
-            //     }
-            //     else
-            //         dd = domain;
-            //     classes.Add(dd);
-
-            //     if (range == null)
-            //     {
-            //         rr = await result.FindRangeOrDomain(op, RangeOrDomain.Range);
-            //         classes.Add(rr);
-            //         dash = true;
-            //     }
-            //     else
-            //         rr = range;
-            //     classes.Add(rr);
-
-            //     var d = dd.GetUriFragment();
-            //     var r = rr.GetUriFragment();
-            //     var p = op.GetUriFragment();
-            //     if (r.Equals(d))
-            //         continue;
-            //     if (dash)
-            //         cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
-            //     else
-            //         cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + propertySupport);
-            // }
-
-            // cModel.AppendLine("class " + instanceClass.Label + "{");
-            // foreach (var dtp in notObjectProperties)
-            // {
-
-            //     int cc = transactions.predicateToIntDict[dtp];//HashmapItem.Where(x => x.Value == dtp).Select(x => x.Key).FirstOrDefault();//.GetValueOrDefault(dtp);// getKey(HashmapItem, dtp);
-            //     var sup = result.propertyMinsup.GetValueOrDefault(cc);
-            //     var val = ds.ontology.Triples.Where(x =>
-            //         x.Subject.ToString().Equals(dtp) &&
-            //         x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
-            //         .Select(x => x.Object.ToString())
-            //         .FirstOrDefault();
-            //     string p = dtp.GetUriFragment();
-            //     if (val != null)
-            //     {
-            //         string r = val.GetUriFragment();
-            //         cModel.AppendLine(p + ":" + r + " sup=" + sup);
-            //     }
-            //     else
-            //     {
-            //         cModel.AppendLine(p + " sup=" + sup);
-            //     }
-            // }
-            // cModel.AppendLine("}");
-
-            // var classesAndSuperClasses = new HashSet<string>();
-            // // get all super classes of the given class
-            // foreach (var c in classes)
-            // {
-            //     classesAndSuperClasses.Add(c);
-            //     var subclasses = result.FindSuperClasses(c, Level.All);
-            //     foreach (var s in subclasses)
-            //         classesAndSuperClasses.Add(s);
-            // }
-            // // get the first super class for each class
-            // foreach (var c in classesAndSuperClasses)
-            // {
-            //     var superClasses = result.FindSuperClasses(c, Level.First);
-
-            //     if (!superClasses.Any())
-            //         continue;
-            //     foreach (var sc in superClasses)
-            //     {
-            //         if (c.Equals(sc))
-            //             continue;
-            //         var c1 = c.GetUriFragment();
-            //         var c2 = sc.GetUriFragment();
-            //         cModel.AppendLine(c2 + " <|-- " + c1);
-            //     }
-            // }
-
-            // cModel.AppendLine("@enduml");
-            // result.contentForUml = cModel.ToString();
-            // return result;
         }
 
     }
