@@ -11,6 +11,7 @@ using VDS.RDF.Parsing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Collections.Concurrent;
 
 namespace LOD_CM_CLI.Data
 {
@@ -78,11 +79,12 @@ namespace LOD_CM_CLI.Data
         public void SetLogger(ServiceProvider serviceProvider)
         {
             IsOpen = false;
-            objectProperties = new Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)>();
+            objectProperties = new Dictionary<string, (string domains, string ranges, bool dash)>();
             dataTypeProperties = new Dictionary<string, string>();
             // objectPropertiesRange = new Dictionary<string, HashSet<string>>();
             log = serviceProvider.GetService<ILogger<Dataset>>();
             superClassesOfClass = new Dictionary<string, HashSet<string>>();
+            classesDepths = new Dictionary<string, Dictionary<string, int>>();
         }
 
         /// <summary>
@@ -173,9 +175,35 @@ namespace LOD_CM_CLI.Data
             // return classUris.Select(x => new InstanceClass(x)).ToList();
         }
 
-
-        public async Task Precomputation()
+        /// <summary>
+        /// The key is a subclass, and the value is composed of its super classes.
+        /// For each super class we have the relative distance
+        /// </summary>
+        /// <value></value>
+        public Dictionary<string, Dictionary<string, int>> classesDepths { get; set; }
+        public void Precomputation()
         {
+            log.LogInformation($"Computing class depth");
+            classesDepths = GetClassesDepth();
+            log.LogInformation($"class depth done: {classesDepths.Count}");
+            log.LogInformation($"classes...");
+            // superClassesOfClass = new Dictionary<string, HashSet<string>>();
+            var classes = ontology.Triples.Where(x =>
+                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
+                x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
+                .Select(x => x.Subject.ToString()).Distinct().ToList();
+            log.LogInformation($"# classes: {classes.Count}");
+            var superClassesOfClassConcurrent = new ConcurrentDictionary<string, HashSet<string>>();
+            // foreach (var @class in classes)
+            Parallel.ForEach(classes, @class =>
+            {
+                var set = FindSuperClasses(@class, Level.First);
+                superClassesOfClassConcurrent.TryAdd(@class, set);
+            });
+            superClassesOfClass = superClassesOfClassConcurrent.ToDictionary(x => x.Key, x => x.Value);
+            log.LogInformation($"classes done");
+            log.LogInformation($"properties");
             // TODO: add logger everywhere 
             var properties = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
@@ -184,24 +212,44 @@ namespace LOD_CM_CLI.Data
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
                 .Select(x => x.Subject.ToString()).Distinct().ToList();
             log.LogInformation($"# properties: {properties.Count}");
-            foreach (var property in properties)
+            GetPropertyDomainRangeOrDataType(properties);
+            log.LogInformation($"properties done");
+        }
+
+        /// <summary>
+        /// For each class, we compute relative distances with its super classes
+        /// </summary>
+        /// <returns></returns>
+        private Dictionary<string, Dictionary<string, int>> GetClassesDepth()
+        {
+            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> select ?sub ?super (count(?mid) as ?distance) WHERE { { SELECT DISTINCT ?mid WHERE { ?s rdfs:subClassOf ?mid . } } ?sub rdfs:subClassOf* ?mid . ?mid rdfs:subClassOf+ ?super . } group by ?sub ?super  order by ?sub ?super";
+            var result = new Dictionary<string, Dictionary<string, int>>();
+            var sparqlResultSet = (SparqlResultSet)ontology.ExecuteQuery(query);
+            foreach (var sparqlResult in sparqlResultSet)
             {
-                await GetPropertyDomainRangeOrDataType(property);
+                var sub = sparqlResult["sub"] as UriNode;
+                var super = sparqlResult["super"] as UriNode;
+                var distance = sparqlResult["distance"] as LiteralNode;
+                int distanceValue;
+                if (!int.TryParse(distance.Value, out distanceValue)) distanceValue = 0;
+                var subUri = sub.Uri.ToString();
+                var superUri = super.Uri.ToString();
+                Dictionary<string, int> dict;
+                if (result.Keys.Contains(subUri))
+                {
+                    dict = result[subUri];
+                }
+                else
+                {
+                    dict = new Dictionary<string, int>();
+                    result.Add(subUri, dict);
+                }
+                if (!dict.Keys.Contains(superUri))
+                {
+                    dict.Add(superUri, distanceValue);
+                }
             }
-            log.LogInformation($"classes...");
-            superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            var classes = ontology.Triples.Where(x =>
-                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
-                x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
-                .Select(x => x.Subject.ToString()).Distinct().ToList();
-            log.LogInformation($"# classes: {classes.Count}");
-            foreach (var @class in classes)
-            {
-                var set = FindSuperClasses(@class, Level.First);
-                superClassesOfClass[@class] = set;
-            }
-            log.LogInformation($"classes done");
+            return result;
         }
 
         /// <summary>
@@ -233,7 +281,7 @@ namespace LOD_CM_CLI.Data
         /// The key is the property uri, the value are its domain(s) and range(s) and the dash
         /// </summary>
         /// <value></value>
-        public Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)> objectProperties { get; set; }
+        public Dictionary<string, (string domain, string range, bool dash)> objectProperties { get; set; }
         // public Dictionary<string, HashSet<string>> objectPropertiesRange {get;private set;}
         /// <summary>
         /// The key is the property uri, the value is its datatype
@@ -241,32 +289,37 @@ namespace LOD_CM_CLI.Data
         /// <value></value>
         public Dictionary<string, string> dataTypeProperties { get; set; }
 
-        public async Task GetPropertyDomainRangeOrDataType(string propertyUri)
+        public void GetPropertyDomainRangeOrDataType(List<string> properties)
         {
-            if (string.IsNullOrWhiteSpace(propertyUri)) return;
-            var propNode = ontology.GetUriNode(
-                new Uri(propertyUri));
-            var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
-            var owlObjectProp = ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
-            if (ontology.ContainsTriple(
-                new Triple(propNode, rdfType, owlObjectProp)))
+            var objectPropertiesConcurrent = new ConcurrentDictionary<string, (string domain, string range, bool dash)>();
+            var dataTypePropertiesConcurrent = new ConcurrentDictionary<string, string>();
+            Parallel.ForEach(properties, propertyUri =>
             {
-                // it is an object property
-                var domainsAndRanges = await GetPropertyDomainRange(propertyUri);
-                objectProperties[propertyUri] = domainsAndRanges;
-                // objectPropertiesDomain.Add(propertyUri, domainsAndRanges.domains);
-                // objectPropertiesRange.Add(propertyUri, domainsAndRanges.ranges);
-            }
-            else
-            {
-                // it is NOT an object property
-                var dataType = GetPropertyDataType(propertyUri);
-                if (!string.IsNullOrWhiteSpace(dataType))
-                    dataTypeProperties[propertyUri] = dataType;
-            }
+                if (string.IsNullOrWhiteSpace(propertyUri)) return;
+                var propNode = ontology.GetUriNode(
+                    new Uri(propertyUri));
+                var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
+                var owlObjectProp = ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
+                if (ontology.ContainsTriple(
+                    new Triple(propNode, rdfType, owlObjectProp)))
+                {
+                    // it is an object property
+                    var domainsAndRanges = GetPropertyDomainRange(propertyUri).Result;
+                    objectPropertiesConcurrent.TryAdd(propertyUri, domainsAndRanges);
+                }
+                else
+                {
+                    // it is NOT an object property
+                    var dataType = GetPropertyDataType(propertyUri);
+                    if (!string.IsNullOrWhiteSpace(dataType))
+                        dataTypePropertiesConcurrent.TryAdd(propertyUri, dataType);
+                }
+            });
+            objectProperties = objectPropertiesConcurrent.ToDictionary(x => x.Key, x => x.Value);
+            dataTypeProperties = dataTypePropertiesConcurrent.ToDictionary(x => x.Key, x => x.Value);
         }
 
-        private async Task<(HashSet<string> domains, HashSet<string> ranges, bool dash)> GetPropertyDomainRange(string propertyUri)
+        private async Task<(string domain, string range, bool dash)> GetPropertyDomainRange(string propertyUri)
         {
             var domains = ontology.Triples.Where(x =>
                 x.Subject.ToString().Equals(propertyUri) &&
@@ -291,8 +344,29 @@ namespace LOD_CM_CLI.Data
                 ranges.Add(await FindRangeOrDomain(propertyUri, RangeOrDomain.Range));
                 dash = true;
             }
+            var result = (GetDeepest(domains), GetDeepest(ranges), dash);
+            return result;
+        }
 
-            return (domains, ranges, dash);
+        public string GetDeepest(IEnumerable<string> classes)
+        {
+            if (!classes.Any()) return "http://www.w3.org/2002/07/owl#Thing";
+            if (classes.Count() == 1) return classes.First();
+            var result = "http://www.w3.org/2002/07/owl#Thing";
+            var max = 0;
+            foreach (var cls in classes.Where(x => !string.IsNullOrWhiteSpace(x)
+                && x.StartsWith(OntologyNameSpace)))
+            {
+                var dict = classesDepths.GetValueOrDefault(cls);
+                if (dict == null || !dict.Any()) continue;
+                var currentMax = dict.Select(x => x.Value).Max();
+                if (max < currentMax)
+                {
+                    max = currentMax;
+                    result = cls; //dict.Where(x => x.Value == currentMax).Select(x => x.Key).FirstOrDefault();
+                }
+            }
+            return result;
         }
 
         private string GetPropertyDataType(string dtp)
@@ -348,7 +422,21 @@ namespace LOD_CM_CLI.Data
                     }
                 }
             }
-            // return the most used type
+            // return the most used type TODO: add depth for classes so we can select only the deepest
+            if (typeMap.Count(x => x.Value == useCounter) > 1)
+            {
+                // several types are used a lot (i.e. with the same number of use). We must choose the deepest
+                var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
+                    .Select(x => x.Key));
+                return deepest;
+            }
+            if (!typeMap.Any(x => x.Value == useCounter))
+            {// TODO: check if HDT project allow multiple iterator 
+                // FIXME: most of time, the counter get stuck to 0....
+                var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
+                    .Select(x => x.Key));
+                return deepest;
+            }
             return typeMap.Where(x => x.Value == useCounter)
                 .Select(x => x.Key).FirstOrDefault();
         }

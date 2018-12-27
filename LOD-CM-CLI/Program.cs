@@ -52,7 +52,7 @@ namespace LOD_CM_CLI
                     await ComputeFpMfpImage(ds, conf.mainDir);
                 }
             }
-            
+
             sw.Stop();
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
@@ -68,14 +68,15 @@ namespace LOD_CM_CLI
                 dataset.dataTypeProperties = datasetTmp.dataTypeProperties;
                 dataset.objectProperties = datasetTmp.objectProperties;
                 dataset.superClassesOfClass = datasetTmp.superClassesOfClass;
+                dataset.classesDepths = datasetTmp.classesDepths;
             }
             else
             {
-                await dataset.Precomputation();
+                dataset.Precomputation();
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(jsonDatasetPath, json);
             }
-            
+
             log.LogInformation("Getting classes...");
             List<InstanceClass> classes;
             var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
@@ -89,12 +90,11 @@ namespace LOD_CM_CLI
                 classes = await dataset.GetInstanceClasses();
                 var json = JsonConvert.SerializeObject(classes);
                 await File.WriteAllTextAsync(jsonClassListPath, json);
-            }            
+            }
             var total = classes.Count();
             log.LogInformation($"# classes: {total}");
             log.LogInformation("Looping on classes...");
             var count = 1;
-            // TODO: parellize this loop
             // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
             Parallel.ForEach(classes, instanceClass =>
             // foreach (var instanceClass in classes)
@@ -119,11 +119,11 @@ namespace LOD_CM_CLI
                     Path.Combine(instancePath, "dictionary.txt")
                 ).RunSynchronously();
 
-                var fpSet = new List<FrequentPattern<int>>();
+                // var fpSet = new List<FrequentPattern<int>>();
 
                 // TODO: put back enumeration over range
                 // foreach (var thresholdInt in new[] {80})//Enumerable.Range(1, 100))
-                foreach (var thresholdInt in Enumerable.Range(50, 100))
+                foreach (var thresholdInt in Enumerable.Range(1, 100))
                 {
                     var threshold = thresholdInt / 100d;
 
@@ -135,42 +135,42 @@ namespace LOD_CM_CLI
                         instancePath,
                         thresholdInt.ToString());
                     Directory.CreateDirectory(imageFilePath);
-                    var (alreadyProcessed, previousFP) = FrequentPattern<int>.Contained(fpSet, fp);
-                    if (alreadyProcessed)
-                    {
-                        // fp are the same than in a previous computation
-                        // We don't need to get image, just to copy it!
-                        var previousThreshold = previousFP.minSupport;
-                        var previousImageFilePath = Path.Combine(
-                            instancePath,
-                            (Convert.ToInt32(previousThreshold * 100)).ToString());
-                        File.Copy(Path.Combine(previousImageFilePath, "fp.txt"), Path.Combine(imageFilePath, "fp.txt"));
-                        File.Copy(Path.Combine(previousImageFilePath, "plant.txt"), Path.Combine(imageFilePath, "plant.txt"));
-                        File.Copy(Path.Combine(previousImageFilePath, "img.svg"), Path.Combine(imageFilePath, "img.svg"));
-                    }
-                    else
-                    {
-                        fpSet.Add(fp);
-                        // await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
-                        fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).RunSynchronously();
+                    // var (alreadyProcessed, previousFP) = FrequentPattern<int>.Contained(fpSet, fp);
+                    // if (alreadyProcessed)
+                    // {
+                    //     // fp are the same than in a previous computation
+                    //     // We don't need to get image, just to copy it!
+                    //     var previousThreshold = previousFP.minSupport;
+                    //     var previousImageFilePath = Path.Combine(
+                    //         instancePath,
+                    //         (Convert.ToInt32(previousThreshold * 100)).ToString());
+                    //     File.Copy(Path.Combine(previousImageFilePath, "fp.txt"), Path.Combine(imageFilePath, "fp.txt"));
+                    //     File.Copy(Path.Combine(previousImageFilePath, "plant.txt"), Path.Combine(imageFilePath, "plant.txt"));
+                    //     File.Copy(Path.Combine(previousImageFilePath, "img.svg"), Path.Combine(imageFilePath, "img.svg"));
+                    // }
+                    // else
+                    // {
+                    // fpSet.Add(fp);
+                    // await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
+                    fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).RunSynchronously();
 
-                        // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
-                        //     instanceClass, threshold, fp);
-                        var igs = ImageGenerator.GenerateTxtForUml(dataset,
-                            instanceClass, threshold, fp).Result;
+                    // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
+                    //     instanceClass, threshold, fp);
+                    var igs = ImageGenerator.GenerateTxtForUml(dataset,
+                        instanceClass, threshold, fp).Result;
 
-                        var counter = 0;
-                        foreach (var ig in igs)
-                        {
-                            counter++;
-                            // await ig.GetImageContent();
-                            // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
-                            // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
-                            ig.GetImageContent().RunSynchronously();
-                            ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).RunSynchronously();
-                            ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).RunSynchronously();
-                        }
+                    var counter = 0;
+                    foreach (var ig in igs)
+                    {
+                        counter++;
+                        // await ig.GetImageContent();
+                        // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
+                        // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
+                        ig.GetImageContent().RunSynchronously();
+                        ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).RunSynchronously();
+                        ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).RunSynchronously();
                     }
+                    // }
                 }
 
             }

@@ -132,11 +132,13 @@ namespace LOD_CM_CLI.Uml
                         var p = property.GetUriFragment();
                         var domainAndRange = fp.transactions.dataset.objectProperties[property];
                         var dash = domainAndRange.dash;
-                        foreach (var domain in domainAndRange.domains)
-                        {
+                        // foreach (var domain in domainAndRange.domain)
+                        // {
+                            var domain = domainAndRange.domain;
                             var d = domain.GetUriFragment();
-                            foreach (var range in domainAndRange.ranges)
-                            {       
+                            // foreach (var range in domainAndRange.ranges)
+                            // {       
+                                var range = domainAndRange.range;
                                 if (domain.Equals(range)) continue;      
                                 var r = range.GetUriFragment();                   
                                 if (dash)
@@ -146,8 +148,8 @@ namespace LOD_CM_CLI.Uml
                                 usedProp.Add(id);
                                 classes.Add(domain);
                                 classes.Add(range);
-                            }
-                        }
+                            // }
+                        // }
                     }
 
                 }
