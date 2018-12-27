@@ -177,7 +177,7 @@ namespace LOD_CM_CLI
                     // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
                     //     instanceClass, threshold, fp);
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
-                        instanceClass, threshold, fp).Result;
+                        instanceClass, threshold, fp, serviceProvider).Result;
 
                     var counter = 0;
                     foreach (var ig in igs)
