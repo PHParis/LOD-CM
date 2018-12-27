@@ -43,6 +43,7 @@ namespace LOD_CM_CLI
             foreach (var dataset in conf.datasets)
             {
                 dataset.SetLogger(serviceProvider);
+                log.LogInformation(dataset.Label);
                 using (var ds = await dataset
                     .LoadHdt())//.LoadHdt() await
                 {

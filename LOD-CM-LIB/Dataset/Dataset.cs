@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace LOD_CM_CLI.Data
 {
@@ -293,8 +294,11 @@ namespace LOD_CM_CLI.Data
         {
             var objectPropertiesConcurrent = new ConcurrentDictionary<string, (string domain, string range, bool dash)>();
             var dataTypePropertiesConcurrent = new ConcurrentDictionary<string, string>();
+            var count = 0;
             Parallel.ForEach(properties, propertyUri =>
+            // Parallel.For(0, properties.Count, i =>
             {
+                // var propertyUri = properties[i];
                 if (string.IsNullOrWhiteSpace(propertyUri)) return;
                 var propNode = ontology.GetUriNode(
                     new Uri(propertyUri));
@@ -314,6 +318,8 @@ namespace LOD_CM_CLI.Data
                     if (!string.IsNullOrWhiteSpace(dataType))
                         dataTypePropertiesConcurrent.TryAdd(propertyUri, dataType);
                 }
+                Interlocked.Increment(ref count);
+                log.LogInformation($"property {count}/{properties.Count}");
             });
             objectProperties = objectPropertiesConcurrent.ToDictionary(x => x.Key, x => x.Value);
             dataTypeProperties = dataTypePropertiesConcurrent.ToDictionary(x => x.Key, x => x.Value);
