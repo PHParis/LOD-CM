@@ -74,6 +74,7 @@ namespace LOD_CM_CLI
             else
             {
                 dataset.Precomputation();
+                log.LogInformation($"Saving after precomputation: {jsonDatasetPath}");
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(jsonDatasetPath, json);
             }
@@ -118,7 +119,7 @@ namespace LOD_CM_CLI
                 transactions.SaveToFiles(
                     Path.Combine(instancePath, "transactions.txt"),
                     Path.Combine(instancePath, "dictionary.txt")
-                ).RunSynchronously();
+                ).Wait();
 
                 // var fpSet = new List<FrequentPattern<int>>();
 
@@ -153,7 +154,7 @@ namespace LOD_CM_CLI
                     // {
                     // fpSet.Add(fp);
                     // await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
-                    fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).RunSynchronously();
+                    fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).Wait();
 
                     // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
                     //     instanceClass, threshold, fp);
@@ -167,9 +168,9 @@ namespace LOD_CM_CLI
                         // await ig.GetImageContent();
                         // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
-                        ig.GetImageContent().RunSynchronously();
-                        ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).RunSynchronously();
-                        ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).RunSynchronously();
+                        ig.GetImageContent().Wait();
+                        ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
+                        ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
                     }
                     // }
                 }

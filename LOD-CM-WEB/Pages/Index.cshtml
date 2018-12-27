@@ -6,7 +6,33 @@
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <p>A tool designed to help users of RDF knowledge bases.</p>
+    <!-- <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p> -->
+</div>
+<article>
+    <header>What is LOD-CM?</header>
+    LOD-CM is a tool that produce a Conceptual Model (CM) thanks to a class diagram.
+    It mines maximal frequent patterns (also known as itemset) upon properties used
+    by instances of a given OWL class to build the most appropriate CMs.
+
+    <h6>But why would I use that?</h6>
+
+    <ul>
+        <li>CMs allow a user to explore dataset without prior knowledge.</li>
+        <li>A user can easily compare two CMs to choose the better suited dataset.</li>
+    </ul>
+    
+</article>
+<div>
+    <header>Let's try it!</header>
+    <form>
+        <select>
+          <option value="dbpedia">DBpedia</option>
+          <option value="wikidata">Wikidata</option>
+        </select>
+    </form>
+</div>
+<div class="text-center">
     <div>
         <!-- <img src="img/test_636811903119501484.svg"/> -->
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="713px" preserveAspectRatio="none" style="width:495px;height:713px;" version="1.1" viewBox="0 0 495 713" width="495px" zoomAndPan="magnify"><defs>
