@@ -14,19 +14,22 @@ using Iternity.PlantUML;
 using System.Net.Http;
 using LOD_CM_CLI.Utils;
 using LOD_CM_CLI.Mining;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LOD_CM_CLI.Uml
 {
     public class ImageGenerator
     {
+        private ILogger log;
 
         private ImageGenerator() { }
 
-        /// <summary>
-        /// Key is the property id, value is its support
-        /// </summary>
-        /// <value></value>
-        public Dictionary<int, int> propertyMinsup { get; private set; }
+        // /// <summary>
+        // /// Key is the property id, value is its support
+        // /// </summary>
+        // /// <value></value>
+        // public Dictionary<int, int> propertyMinsup { get; private set; }
 
         /// <summary>
         /// Content sended to PlantUML for image generation
@@ -39,27 +42,35 @@ namespace LOD_CM_CLI.Uml
         /// <value></value>
         public string svgFileContent { get; private set; }
 
-        /// <summary>
-        /// the key is a class uri and value contains all its direct super class,
-        /// i.e. there is a gap of only one between classes from value and the key.
-        /// For example, Actor will have only Artist (not Person because Person 
-        /// is too far from Actor (distance of 2))
-        /// </summary>
-        private Dictionary<string, HashSet<string>> superClassesOfClass;
-        public FrequentPattern<int> fp {get;private set;}
+        // /// <summary>
+        // /// the key is a class uri and value contains all its direct super class,
+        // /// i.e. there is a gap of only one between classes from value and the key.
+        // /// For example, Actor will have only Artist (not Person because Person 
+        // /// is too far from Actor (distance of 2))
+        // /// </summary>
+        // private Dictionary<string, HashSet<string>> superClassesOfClass;
+        public FrequentPattern<int> fp { get; private set; }
 
         /// <summary>
         /// Download SVG file content from PlantUML
         /// </summary>
         /// <returns></returns>
-        public async Task<string> GetImageContent()
+        public async Task<bool> GetImageContent()
         {
-            var uri = PlantUMLUrl.SVG(contentForUml);
-            using (var client = new HttpClient())
+            try
             {
-                svgFileContent = await client.GetStringAsync(uri);
+                var uri = PlantUMLUrl.SVG(contentForUml);
+                using (var client = new HttpClient())
+                {
+                    svgFileContent = await client.GetStringAsync(uri);
+                }
+                return true;
             }
-            return svgFileContent;
+            catch (Exception ex)
+            {
+                log.LogError($"{fp.transactions.instanceClass.Label} ({fp.minSupport}): {ex.Message}");
+            }
+            return false;
         }
 
         public async Task SaveImage(string filePath)
@@ -71,33 +82,42 @@ namespace LOD_CM_CLI.Uml
             await File.WriteAllTextAsync(filePath, contentForUml);
         }
 
-
+        /// <summary>
+        /// Return strings representing a class hierarchy for PlantUML.
+        /// For example, Person <|-- Agent.
+        /// </summary>
+        /// <param name="classUri"></param>
+        /// <returns></returns>
         public IEnumerable<string> GetAllSuperClasses(string classUri)
         {
-            var set = fp.transactions.dataset.superClassesOfClass[classUri];
-            if (!set.Any()) yield return string.Empty;
+            if ("http://www.w3.org/2002/07/owl#Thing".Equals(classUri))
+                yield return string.Empty;
+            else if (!fp.transactions.dataset.superClassesOfClass.ContainsKey(classUri))
+                yield return string.Empty;
             else
             {
-                foreach (var superClass in set)
+                var set = fp.transactions.dataset.superClassesOfClass[classUri];
+                if (!set.Any()) yield return string.Empty;
+                else
                 {
-                    var c = classUri.GetUriFragment();
-                    var sc = superClass.GetUriFragment();
-                    yield return c + " <|-- " + sc;
-                    foreach (var res in GetAllSuperClasses(superClass))
+                    foreach (var superClass in set)
                     {
-                        yield return res;
+                        var c = classUri.GetUriFragment();
+                        var sc = superClass.GetUriFragment();
+                        yield return c + " <|-- " + sc;
+                        foreach (var res in GetAllSuperClasses(superClass))
+                        {
+                            yield return res;
+                        }
                     }
                 }
             }
-            
-            // return set.Union(set
-            //     .SelectMany(uri => GetAllSuperClasses(uri))).ToHashSet();
         }
 
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
             InstanceClass instanceClass, double threshold,
-            FrequentPattern<int> fp)
+            FrequentPattern<int> fp, ServiceProvider serviceProvider)
         {
             // result.propertyMinsup = new Dictionary<int, int>();
 
@@ -113,13 +133,14 @@ namespace LOD_CM_CLI.Uml
             foreach (var mfp in maximalSets)
             {
                 var result = new ImageGenerator();
+                result.log = serviceProvider.GetService<ILogger<ImageGenerator>>();
                 result.fp = fp;
                 finalResults.Add(result);
                 var cModel = new StringBuilder();
 
                 cModel.AppendLine("@startuml");
                 cModel.AppendLine("skinparam linetype ortho");
-                
+
                 var propertySupport = Convert.ToInt32(mfp.Support * 100);
                 var usedProp = new HashSet<int>();
                 var classes = new HashSet<string>();
@@ -134,21 +155,21 @@ namespace LOD_CM_CLI.Uml
                         var dash = domainAndRange.dash;
                         // foreach (var domain in domainAndRange.domain)
                         // {
-                            var domain = domainAndRange.domain;
-                            var d = domain.GetUriFragment();
-                            // foreach (var range in domainAndRange.ranges)
-                            // {       
-                                var range = domainAndRange.range;
-                                if (domain.Equals(range)) continue;      
-                                var r = range.GetUriFragment();                   
-                                if (dash)
-                                    cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
-                                else
-                                    cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + propertySupport);
-                                usedProp.Add(id);
-                                classes.Add(domain);
-                                classes.Add(range);
-                            // }
+                        var domain = domainAndRange.domain;
+                        var d = domain.GetUriFragment();
+                        // foreach (var range in domainAndRange.ranges)
+                        // {       
+                        var range = domainAndRange.range;
+                        if (domain.Equals(range)) continue;
+                        var r = range.GetUriFragment();
+                        if (dash)
+                            cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
+                        else
+                            cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + propertySupport);
+                        usedProp.Add(id);
+                        classes.Add(domain);
+                        classes.Add(range);
+                        // }
                         // }
                     }
 
@@ -164,7 +185,7 @@ namespace LOD_CM_CLI.Uml
                         var datatype = fp.transactions.dataset.dataTypeProperties.GetValueOrDefault(property);
                         var r = datatype.GetUriFragment();
                         cModel.AppendLine(p + ":" + r + " sup=" + propertySupport);
-                        usedProp.Add(id);                            
+                        usedProp.Add(id);
                     }
                 }
                 // third loop for properties without info
@@ -178,7 +199,8 @@ namespace LOD_CM_CLI.Uml
                 // loop for current class hierarchy
                 foreach (var line in result.GetAllSuperClasses(instanceClass.Uri))
                 {
-                    cModel.AppendLine(line);
+                    if (!string.IsNullOrWhiteSpace(line))
+                        cModel.AppendLine(line);
                 }
                 // loop for related classes hierarchy
                 foreach (var classUri in classes)
@@ -187,7 +209,7 @@ namespace LOD_CM_CLI.Uml
                     foreach (var superClass in fp.transactions.dataset.superClassesOfClass[classUri])
                     {
                         var sc = superClass.GetUriFragment();
-                        cModel.AppendLine(c + " <|-- " + sc);
+                        cModel.AppendLine(sc + " <|-- " + c);
                     }
                 }
                 cModel.AppendLine("@enduml");

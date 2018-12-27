@@ -11,14 +11,17 @@ namespace LOD_CM_CLI.Mining
     public class TransactionList<T> where T : IComparable<T>, IConvertible
     {
         public List<T> domain { get; private set; }
+
+        public InstanceClass instanceClass { get; set; }
+
         public Dictionary<string, T> predicateToIntDict { get; private set; }
         public Dictionary<T, string> intToPredicateDict { get; private set; }
         public Dataset dataset { get; private set; }
 
-        private TransactionList() {}
+        private TransactionList() { }
 
         public List<Transaction<T>> transactions { get; private set; }
-        
+
 
         /// <summary>
         /// Save transactions and dictionary to given file paths
@@ -36,7 +39,7 @@ namespace LOD_CM_CLI.Mining
         {
             await File.WriteAllLinesAsync(transactionsFilePath,
                 transactions.Select(x => string.Join(" ", x)));
-            
+
             await File.WriteAllLinesAsync(dictionaryFilePath,
                 intToPredicateDict.Select(x => x.Key + " " + x.Value));
         }
@@ -52,6 +55,7 @@ namespace LOD_CM_CLI.Mining
             if (!dataset.IsOpen)
                 await dataset.LoadHdt();
             var instances = await dataset.GetInstances(instanceClass);
+            result.instanceClass = instanceClass;
             result.predicateToIntDict = new Dictionary<string, T>();
             result.intToPredicateDict = new Dictionary<T, string>();
             result.transactions = new List<Transaction<T>>();
@@ -84,6 +88,6 @@ namespace LOD_CM_CLI.Mining
         }
 
 
-        
+
     }
 }

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using HDTDotnet;
 using Iternity.PlantUML;
@@ -42,15 +43,28 @@ namespace LOD_CM_CLI
             var sw = Stopwatch.StartNew();
             foreach (var dataset in conf.datasets)
             {
-                dataset.SetLogger(serviceProvider);
-                log.LogInformation(dataset.Label);
-                using (var ds = await dataset
-                    .LoadHdt())//.LoadHdt() await
+                try
                 {
-                    // ds.Label = dsLabel;
-                    // ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
-                    // ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
-                    await ComputeFpMfpImage(ds, conf.mainDir);
+                    dataset.SetLogger(serviceProvider);
+                    log.LogInformation(dataset.Label);
+                    using (var ds = await dataset
+                        .LoadHdt())//.LoadHdt() await
+                    {
+                        // ds.Label = dsLabel;
+                        // ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
+                        // ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
+                        await ComputeFpMfpImage(ds, conf.mainDir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex.Message);
+                    log.LogError(ex.StackTrace);
+                    if (ex.InnerException != null)
+                    {
+                        log.LogError(ex.InnerException.Message);
+                        log.LogError(ex.InnerException.StackTrace);
+                    }
                 }
             }
 
@@ -93,15 +107,19 @@ namespace LOD_CM_CLI
                 var json = JsonConvert.SerializeObject(classes);
                 await File.WriteAllTextAsync(jsonClassListPath, json);
             }
+#if DEBUG
+            classes = classes.Take(1).ToList();
+#endif
             var total = classes.Count();
             log.LogInformation($"# classes: {total}");
             log.LogInformation("Looping on classes...");
-            var count = 1;
+            var count = 0;
             // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
             Parallel.ForEach(classes, instanceClass =>
             // foreach (var instanceClass in classes)
             {
-                log.LogInformation($"class: {instanceClass.Label} ({count++}/{total})");
+                Interlocked.Increment(ref count);
+                log.LogInformation($"class: {instanceClass.Label} ({count}/{total})");
                 // var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
                 var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
                 log.LogDebug($"transactions computed: {transactions.transactions.Count}");
@@ -168,13 +186,15 @@ namespace LOD_CM_CLI
                         // await ig.GetImageContent();
                         // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
-                        ig.GetImageContent().Wait();
-                        ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
-                        ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
+                        var isDownloadOK = ig.GetImageContent().Result;
+                        if (isDownloadOK)
+                        {
+                            ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
+                            ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
+                        }
                     }
                     // }
                 }
-
             }
             );
 
