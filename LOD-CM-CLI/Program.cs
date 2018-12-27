@@ -14,6 +14,7 @@ using LOD_CM_CLI.Mining;
 using LOD_CM_CLI.Uml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using NLog.Extensions.Logging;
 using VDS.RDF.Ontology;
 
@@ -29,22 +30,29 @@ namespace LOD_CM_CLI
         {
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
-            var configContent = await File.ReadAllLinesAsync(args[1]);
-            var dsHdt = configContent[0]; // Path.Combine(@"E:\download", "dataset.hdt")
-            var dsOnto = configContent[1];// Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt")
-            var dsLabel = configContent[2]; // DBpedia
-            var dsPropertyType = configContent[3]; // OntologyHelper.PropertyType;
-            var dsOntologyNameSpace = configContent[4]; // "http://dbpedia.org/ontology/"
-            var mainDir = configContent[5]; // @"E:\download"
+            var confContent = await File.ReadAllTextAsync(args[1]);
+            var conf = JsonConvert.DeserializeObject<Conf>(confContent);
+            // var configContent = await File.ReadAllLinesAsync(args[1]);
+            // var dsHdt = confContent[0]; // Path.Combine(@"E:\download", "dataset.hdt")
+            // var dsOnto = confContent[1];// Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt")
+            // var dsLabel = confContent[2]; // DBpedia
+            // var dsPropertyType = confContent[3]; // OntologyHelper.PropertyType;
+            // var dsOntologyNameSpace = confContent[4]; // "http://dbpedia.org/ontology/"
+            // var mainDir = confContent[5]; // @"E:\download"
             var sw = Stopwatch.StartNew();
-            using (var ds = await Dataset.Create(dsHdt, dsOnto, serviceProvider)
-                .LoadHdt())//.LoadHdt() await
+            foreach (var dataset in conf.datasets)
             {
-                ds.Label = dsLabel;
-                ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
-                ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
-                await ComputeFpMfpImage(ds, mainDir);
+                dataset.SetLogger(serviceProvider);
+                using (var ds = await dataset
+                    .LoadHdt())//.LoadHdt() await
+                {
+                    // ds.Label = dsLabel;
+                    // ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
+                    // ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
+                    await ComputeFpMfpImage(ds, conf.mainDir);
+                }
             }
+            
             sw.Stop();
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
@@ -52,9 +60,36 @@ namespace LOD_CM_CLI
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
         {
             log.LogInformation("Precomputation...");
-            await dataset.Precomputation();
+            var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label, "dataset.json");
+            if (File.Exists(jsonDatasetPath))
+            {
+                var content = await File.ReadAllTextAsync(jsonDatasetPath);
+                var datasetTmp = JsonConvert.DeserializeObject<Dataset>(content);
+                dataset.dataTypeProperties = datasetTmp.dataTypeProperties;
+                dataset.objectProperties = datasetTmp.objectProperties;
+                dataset.superClassesOfClass = datasetTmp.superClassesOfClass;
+            }
+            else
+            {
+                await dataset.Precomputation();
+                var json = JsonConvert.SerializeObject(dataset);
+                await File.WriteAllTextAsync(jsonDatasetPath, json);
+            }
+            
             log.LogInformation("Getting classes...");
-            var classes = await dataset.GetInstanceClasses();
+            List<InstanceClass> classes;
+            var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
+            if (File.Exists(jsonClassListPath))
+            {
+                var content = await File.ReadAllTextAsync(jsonClassListPath);
+                classes = JsonConvert.DeserializeObject<List<InstanceClass>>(content);
+            }
+            else
+            {
+                classes = await dataset.GetInstanceClasses();
+                var json = JsonConvert.SerializeObject(classes);
+                await File.WriteAllTextAsync(jsonClassListPath, json);
+            }            
             var total = classes.Count();
             log.LogInformation($"# classes: {total}");
             log.LogInformation("Looping on classes...");

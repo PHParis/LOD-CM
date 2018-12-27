@@ -10,6 +10,7 @@ using VDS.RDF.Ontology;
 using VDS.RDF.Parsing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace LOD_CM_CLI.Data
 {
@@ -23,6 +24,7 @@ namespace LOD_CM_CLI.Data
         /// If true, then the HDT file has been opened and loaded in memory.
         /// </summary>
         /// <value></value>
+        [JsonIgnore]
         public bool IsOpen { get; private set; }
 
         /// <summary>
@@ -40,11 +42,12 @@ namespace LOD_CM_CLI.Data
         private HDT hdt;
         public string hdtFilePath { get; set; }
         public string ontologyFilePath { get; set; }
-        public bool IsOntologyAvailable { get; private set; }
+        public bool IsOntologyAvailable { get; set; }
 
         public string Label { get; set; }
 
         private IGraph _ontology;
+        [JsonIgnore]
         public IGraph ontology
         {
             get
@@ -58,9 +61,10 @@ namespace LOD_CM_CLI.Data
             }
         }
 
+        public Dataset() { }
+
         private Dataset(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider)
         {
-            IsOpen = false;
             this.hdtFilePath = hdtFilePath;
             if (!File.Exists(hdtFilePath))
                 throw new FileNotFoundException("You must provide an existing HDT file path!", hdtFilePath);
@@ -68,10 +72,17 @@ namespace LOD_CM_CLI.Data
             // we just check if an ontology file is provided
             this.IsOntologyAvailable = ontologyFilePath != null &&
                 File.Exists(ontologyFilePath);
+            SetLogger(serviceProvider);
+        }
+
+        public void SetLogger(ServiceProvider serviceProvider)
+        {
+            IsOpen = false;
             objectProperties = new Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)>();
             dataTypeProperties = new Dictionary<string, string>();
             // objectPropertiesRange = new Dictionary<string, HashSet<string>>();
             log = serviceProvider.GetService<ILogger<Dataset>>();
+            superClassesOfClass = new Dictionary<string, HashSet<string>>();
         }
 
         /// <summary>
@@ -145,30 +156,31 @@ namespace LOD_CM_CLI.Data
         /// Return all classes (types)
         /// </summary>
         /// <returns></returns>
-        public async Task<IEnumerable<InstanceClass>> GetInstanceClasses()
+        public async Task<List<InstanceClass>> GetInstanceClasses()
         {
-            if (!IsOpen) await LoadHdt();
             // check if we have an ontology. If yes use it ! If not, use HDT
             if (IsOntologyAvailable)
             {
                 var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
                 var owlClass = ontology.GetUriNode(new Uri(OntologyHelper.OwlClass));
                 return ontology.GetTriplesWithPredicateObject(rdfType, owlClass)
-                    .Select(x => new InstanceClass(x.Subject.ToString()));
+                    .Select(x => new InstanceClass(x.Subject.ToString())).ToList();
             }
-            var classUris = hdt.search("", OntologyHelper.PropertyType, "")
-                .Select(x => x.getObject()).ToHashSet();
-            return classUris.Select(x => new InstanceClass(x));
+            if (!IsOpen) await LoadHdt();
+            return hdt.search("", OntologyHelper.PropertyType, "")
+                .Select(x => x.getObject()).Distinct()
+                .Select(x => new InstanceClass(x)).ToList();
+            // return classUris.Select(x => new InstanceClass(x)).ToList();
         }
 
 
         public async Task Precomputation()
-        {            
+        {
             // TODO: add logger everywhere 
-            var properties = ontology.Triples.Where(x => 
+            var properties = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
-                x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty)||
+                x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
                 .Select(x => x.Subject.ToString()).Distinct().ToList();
             log.LogInformation($"# properties: {properties.Count}");
@@ -178,7 +190,7 @@ namespace LOD_CM_CLI.Data
             }
             log.LogInformation($"classes...");
             superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            var classes = ontology.Triples.Where(x => 
+            var classes = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
@@ -221,19 +233,19 @@ namespace LOD_CM_CLI.Data
         /// The key is the property uri, the value are its domain(s) and range(s) and the dash
         /// </summary>
         /// <value></value>
-        public Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)> objectProperties{get;private set;}
+        public Dictionary<string, (HashSet<string> domains, HashSet<string> ranges, bool dash)> objectProperties { get; set; }
         // public Dictionary<string, HashSet<string>> objectPropertiesRange {get;private set;}
         /// <summary>
         /// The key is the property uri, the value is its datatype
         /// </summary>
         /// <value></value>
-        public Dictionary<string, string> dataTypeProperties {get;private set;}
+        public Dictionary<string, string> dataTypeProperties { get; set; }
 
         public async Task GetPropertyDomainRangeOrDataType(string propertyUri)
         {
             if (string.IsNullOrWhiteSpace(propertyUri)) return;
             var propNode = ontology.GetUriNode(
-                new Uri(propertyUri));            
+                new Uri(propertyUri));
             var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
             var owlObjectProp = ontology.GetUriNode(new Uri(OntologyHelper.OwlObjectProperty));
             if (ontology.ContainsTriple(
@@ -290,7 +302,7 @@ namespace LOD_CM_CLI.Data
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyRange))
                 .Select(x => x.Object.ToString())
                 .FirstOrDefault();
-        }         
+        }
 
 
         /// <summary>
@@ -344,13 +356,13 @@ namespace LOD_CM_CLI.Data
         {
             First,
             All
-        }        
+        }
         public enum RangeOrDomain
         {
             Range,
             Domain
         }
-        public Dictionary<string, HashSet<string>> superClassesOfClass {get; private set;}
+        public Dictionary<string, HashSet<string>> superClassesOfClass { get; set; }
 
     }
 }
