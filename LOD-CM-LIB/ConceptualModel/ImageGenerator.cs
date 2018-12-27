@@ -104,7 +104,7 @@ namespace LOD_CM_CLI.Uml
                     {
                         var c = classUri.GetUriFragment();
                         var sc = superClass.GetUriFragment();
-                        yield return c + " <|-- " + sc;
+                        yield return sc + " <|-- " + c;
                         foreach (var res in GetAllSuperClasses(superClass))
                         {
                             yield return res;

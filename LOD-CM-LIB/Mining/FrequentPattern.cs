@@ -16,7 +16,7 @@ namespace LOD_CM_CLI.Mining
     public class FrequentPattern<T> where T : System.IComparable<T>, IConvertible
     {
         private ILogger log;
-        public TransactionList<T> transactions {get;private set;}
+        public TransactionList<T> transactions { get; private set; }
         public double minSupport { get; private set; }
         public ItemSets<T> fis { get; private set; }
 
@@ -24,8 +24,8 @@ namespace LOD_CM_CLI.Mining
         {
             log = serviceProvider.GetService<ILogger<FrequentPattern<T>>>();
         }
-        
-        
+
+
         /// <summary>
         /// Return true if the FP is contained in the set (i.e.
         /// if it has already been computed).
@@ -42,7 +42,7 @@ namespace LOD_CM_CLI.Mining
                 var currentSetOfSet = currentFP.fis.Select(z => z.ToHashSet()).ToHashSet();
                 return setOfSet.All(y => currentSetOfSet.Any(z => z.SetEquals(y)));
             });
-            return (oldFP != null, oldFP);  
+            return (oldFP != null, oldFP);
         }
 
         /// <summary>
@@ -56,6 +56,12 @@ namespace LOD_CM_CLI.Mining
         {
             await File.WriteAllLinesAsync(fpFilePath,
                 fis.Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
+            );
+        }
+        public async Task SaveMFP(string fpFilePath)
+        {
+            await File.WriteAllLinesAsync(fpFilePath,
+                fis.Where(x => x.IsMaximal).Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
             );
         }
 
@@ -87,7 +93,7 @@ namespace LOD_CM_CLI.Mining
             #endregion
             return fis;
         }
-                
+
         /// <summary>
         /// Compute all Maximum Frequent Pattern from a Frequent Pattern list.
         /// </summary>
@@ -114,6 +120,6 @@ namespace LOD_CM_CLI.Mining
         {
             return !fis.Any(x => x.IsProperSupersetOf(rule));
         }
-        
+
     }
 }

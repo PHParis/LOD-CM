@@ -8,6 +8,14 @@
       "ontologyFilePath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/dbpedia_2016-10.nt",
       "IsOntologyAvailable": true,
       "Label": "DBpedia"
+    },
+    {
+      "PropertyType": "http://www.wikidata.org/prop/direct/P31",
+      "OntologyNameSpace": "http://www.wikidata.org/entity/",
+      "hdtFilePath": "/data2/hamdif/doctorants/ph/linkeddatasets/hdt/wikidata/wikidata-20170313-all-BETA.hdt",
+      "ontologyFilePath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/wikidata-taxonomy.nt",
+      "IsOntologyAvailable": true,
+      "Label": "Wikidata"
     }
   ]
 }

@@ -33,13 +33,6 @@ namespace LOD_CM_CLI
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
             var conf = JsonConvert.DeserializeObject<Conf>(confContent);
-            // var configContent = await File.ReadAllLinesAsync(args[1]);
-            // var dsHdt = confContent[0]; // Path.Combine(@"E:\download", "dataset.hdt")
-            // var dsOnto = confContent[1];// Path.Combine(@"C:\dev\dotnet\LOD-CM\LOD-CM-CLI\examples", "dbpedia_2016-10.nt")
-            // var dsLabel = confContent[2]; // DBpedia
-            // var dsPropertyType = confContent[3]; // OntologyHelper.PropertyType;
-            // var dsOntologyNameSpace = confContent[4]; // "http://dbpedia.org/ontology/"
-            // var mainDir = confContent[5]; // @"E:\download"
             var sw = Stopwatch.StartNew();
             foreach (var dataset in conf.datasets)
             {
@@ -47,12 +40,8 @@ namespace LOD_CM_CLI
                 {
                     dataset.SetLogger(serviceProvider);
                     log.LogInformation(dataset.Label);
-                    using (var ds = await dataset
-                        .LoadHdt())//.LoadHdt() await
+                    using (var ds = await dataset.LoadHdt())
                     {
-                        // ds.Label = dsLabel;
-                        // ds.PropertyType = dsPropertyType;//OntologyHelper.PropertyType;
-                        // ds.OntologyNameSpace = dsOntologyNameSpace;//"http://dbpedia.org/ontology/";
                         await ComputeFpMfpImage(ds, conf.mainDir);
                     }
                 }
@@ -67,7 +56,6 @@ namespace LOD_CM_CLI
                     }
                 }
             }
-
             sw.Stop();
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
@@ -92,6 +80,12 @@ namespace LOD_CM_CLI
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(jsonDatasetPath, json);
             }
+            if (!dataset.dataTypeProperties.Any() || 
+                !dataset.objectProperties.Any() || 
+                !dataset.superClassesOfClass.Any() || 
+                !dataset.classesDepths.Any())
+                throw new Exception(@"Something went wrong during precomputation.
+                    One of the dataset property is empty!");
 
             log.LogInformation("Getting classes...");
             List<InstanceClass> classes;
@@ -114,13 +108,12 @@ namespace LOD_CM_CLI
             log.LogInformation($"# classes: {total}");
             log.LogInformation("Looping on classes...");
             var count = 0;
-            // foreach (var instanceClass in new[]{new InstanceClass("http://dbpedia.org/ontology/Film")})//classes)
+
             Parallel.ForEach(classes, instanceClass =>
-            // foreach (var instanceClass in classes)
             {
                 Interlocked.Increment(ref count);
                 log.LogInformation($"class: {instanceClass.Label} ({count}/{total})");
-                // var transactions = await TransactionList<int>.GetTransactions(dataset, instanceClass);
+
                 var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
                 log.LogDebug($"transactions computed: {transactions.transactions.Count}");
                 // ex: ${workingdirectory}/DBpedia/Film
@@ -130,21 +123,15 @@ namespace LOD_CM_CLI
                     instanceClass.Label
                 );
                 Directory.CreateDirectory(instancePath);
-                // await transactions.SaveToFiles(
-                //     Path.Combine(instancePath, "transactions.txt"),
-                //     Path.Combine(instancePath, "dictionary.txt")
-                // );
+
                 transactions.SaveToFiles(
                     Path.Combine(instancePath, "transactions.txt"),
                     Path.Combine(instancePath, "dictionary.txt")
                 ).Wait();
 
-                // var fpSet = new List<FrequentPattern<int>>();
-
-                // TODO: put back enumeration over range
-                // foreach (var thresholdInt in new[] {80})//Enumerable.Range(1, 100))
                 foreach (var thresholdInt in Enumerable.Range(1, 100))
                 {
+                    log.LogInformation($"class: {instanceClass.Label} // threshold: {thresholdInt})");
                     var threshold = thresholdInt / 100d;
 
                     var fp = new FrequentPattern<int>(serviceProvider);
@@ -155,27 +142,9 @@ namespace LOD_CM_CLI
                         instancePath,
                         thresholdInt.ToString());
                     Directory.CreateDirectory(imageFilePath);
-                    // var (alreadyProcessed, previousFP) = FrequentPattern<int>.Contained(fpSet, fp);
-                    // if (alreadyProcessed)
-                    // {
-                    //     // fp are the same than in a previous computation
-                    //     // We don't need to get image, just to copy it!
-                    //     var previousThreshold = previousFP.minSupport;
-                    //     var previousImageFilePath = Path.Combine(
-                    //         instancePath,
-                    //         (Convert.ToInt32(previousThreshold * 100)).ToString());
-                    //     File.Copy(Path.Combine(previousImageFilePath, "fp.txt"), Path.Combine(imageFilePath, "fp.txt"));
-                    //     File.Copy(Path.Combine(previousImageFilePath, "plant.txt"), Path.Combine(imageFilePath, "plant.txt"));
-                    //     File.Copy(Path.Combine(previousImageFilePath, "img.svg"), Path.Combine(imageFilePath, "img.svg"));
-                    // }
-                    // else
-                    // {
-                    // fpSet.Add(fp);
-                    // await fp.SaveFP(Path.Combine(imageFilePath, "fp.txt"));
                     fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).Wait();
+                    fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt")).Wait();
 
-                    // var igs = await ImageGenerator.GenerateTxtForUml(dataset,
-                    //     instanceClass, threshold, fp);
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
                         instanceClass, threshold, fp, serviceProvider).Result;
 
@@ -183,9 +152,6 @@ namespace LOD_CM_CLI
                     foreach (var ig in igs)
                     {
                         counter++;
-                        // await ig.GetImageContent();
-                        // await ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
-                        // await ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg"));
                         var isDownloadOK = ig.GetImageContent().Result;
                         if (isDownloadOK)
                         {
@@ -193,7 +159,6 @@ namespace LOD_CM_CLI
                             ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
                         }
                     }
-                    // }
                 }
             }
             );
