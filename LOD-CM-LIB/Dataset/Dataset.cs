@@ -56,6 +56,10 @@ namespace LOD_CM_CLI.Data
         public string Label { get; set; }
 
         private IGraph _ontology;
+        public Dictionary<string, InstanceLabel> properties { get; set; }
+
+        public Dictionary<string, InstanceLabel> classes { get; set; }
+
         [JsonIgnore]
         public IGraph ontology
         {
@@ -103,7 +107,7 @@ namespace LOD_CM_CLI.Data
         public async Task<List<string>> GetInstances(InstanceLabel instanceClass)
         {
             if (!IsOpen) await LoadHdt();
-            return hdt.search("", OntologyHelper.PropertyType, instanceClass.Uri)
+            return hdt.search("", PropertyType, instanceClass.Uri)
                 .Select(x => x.getSubject()).ToList();
         }
 
@@ -177,7 +181,7 @@ namespace LOD_CM_CLI.Data
                     .Select(x => new InstanceLabel(x.Subject.ToString(), propertyForLabel, this)).ToList();
             }
             if (!IsOpen) await LoadHdt();
-            return hdt.search("", OntologyHelper.PropertyType, "")
+            return hdt.search("", PropertyType, "")
                 .Select(x => x.getObject()).Distinct()
                 .Select(x => new InstanceLabel(x, propertyForLabel, this)).ToList();
             // return classUris.Select(x => new InstanceClass(x)).ToList();
@@ -196,31 +200,35 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"class depth done: {classesDepths.Count}");
             log.LogInformation($"classes...");
             // superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            var classes = ontology.Triples.Where(x =>
+            classes = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
-                .Select(x => x.Subject.ToString()).Distinct().ToList();
+                .Select(x => x.Subject.ToString()).Distinct()
+                .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
+                .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# classes: {classes.Count}");
             var superClassesOfClassConcurrent = new ConcurrentDictionary<string, HashSet<string>>();
             // foreach (var @class in classes)
-            Parallel.ForEach(classes, @class =>
+            Parallel.ForEach(classes.Values, @class =>
             {
-                var set = FindSuperClasses(@class, Level.First);
-                superClassesOfClassConcurrent.TryAdd(@class, set);
+                var set = FindSuperClasses(@class.Uri, Level.First);
+                superClassesOfClassConcurrent.TryAdd(@class.Uri, set);
             });
             superClassesOfClass = superClassesOfClassConcurrent.ToDictionary(x => x.Key, x => x.Value);
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
             // TODO: add logger everywhere 
-            var properties = ontology.Triples.Where(x =>
+            properties = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
-                .Select(x => x.Subject.ToString()).Distinct().ToList();
+                .Select(x => x.Subject.ToString()).Distinct()
+                .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
+                .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# properties: {properties.Count}");
-            GetPropertyDomainRangeOrDataType(properties);
+            GetPropertyDomainRangeOrDataType(properties.Values.Select(x => x.Uri).ToList());
             log.LogInformation($"properties done");
         }
 
@@ -435,7 +443,7 @@ namespace LOD_CM_CLI.Data
                     }
                 }
             }
-            // return the most used type TODO: add depth for classes so we can select only the deepest
+            // return the deepest used type 
             if (typeMap.Count(x => x.Value == useCounter) > 1)
             {
                 // several types are used a lot (i.e. with the same number of use). We must choose the deepest

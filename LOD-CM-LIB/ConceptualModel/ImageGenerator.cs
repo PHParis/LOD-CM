@@ -17,12 +17,15 @@ using LOD_CM_CLI.Mining;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using PlantUml.Net;
+using Newtonsoft.Json;
 
 namespace LOD_CM_CLI.Uml
 {
     public class ImageGenerator
     {
         private ILogger log;
+        public HashSet<InstanceLabel> usedPropInstanceLabel {get;set;}
+        public HashSet<InstanceLabel> usedClassInstanceLabel {get;set;}
 
         private ImageGenerator() { }
 
@@ -100,6 +103,14 @@ namespace LOD_CM_CLI.Uml
             await File.WriteAllTextAsync(filePath, contentForUml);
         }
 
+        public async Task SaveUsedClassesAndProperties(string usedClassesFilePath, string usedPropsFilePath)
+        {
+            var json = JsonConvert.SerializeObject(usedClassInstanceLabel);
+            await File.WriteAllTextAsync(usedClassesFilePath, json);
+            json = JsonConvert.SerializeObject(usedPropInstanceLabel);
+            await File.WriteAllTextAsync(usedPropsFilePath, json);
+        }
+
         /// <summary>
         /// Return strings representing a class hierarchy for PlantUML.
         /// For example, Person <|-- Agent.
@@ -120,8 +131,16 @@ namespace LOD_CM_CLI.Uml
                 {
                     foreach (var superClass in set)
                     {
-                        var c = classUri.GetUriFragment();
-                        var sc = superClass.GetUriFragment();
+                        var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
+                            fp.transactions.dataset.classes[classUri] : 
+                            new InstanceLabel(classUri, null, null);
+                        usedClassInstanceLabel.Add(cIL);
+                        var c = cIL.Label;
+                        var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
+                            fp.transactions.dataset.classes[superClass] : 
+                            new InstanceLabel(superClass, null, null);
+                        usedClassInstanceLabel.Add(scIL);
+                        var sc = scIL.Label;
                         yield return sc + " <|-- " + c;
                         foreach (var res in GetAllSuperClasses(superClass))
                         {
@@ -156,6 +175,8 @@ namespace LOD_CM_CLI.Uml
 
                 var propertySupport = Convert.ToInt32(mfp.Support * 100);
                 var usedProp = new HashSet<int>();
+                result.usedPropInstanceLabel = new HashSet<InstanceLabel>();
+                result.usedClassInstanceLabel = new HashSet<InstanceLabel>();
                 var classes = new HashSet<string>();
                 // first loop for object properties
                 foreach (var id in mfp)
@@ -163,18 +184,26 @@ namespace LOD_CM_CLI.Uml
                     var property = fp.transactions.intToPredicateDict[id];
                     if (fp.transactions.dataset.objectProperties.ContainsKey(property))
                     {
-                        var p = property.GetUriFragment();
+                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
+                            fp.transactions.dataset.properties[property] :
+                            new InstanceLabel(property, null, null);
+                        result.usedPropInstanceLabel.Add(pIL);
+                        var p = pIL.Label;
                         var domainAndRange = fp.transactions.dataset.objectProperties[property];
                         var dash = domainAndRange.dash;
-                        // foreach (var domain in domainAndRange.domain)
-                        // {
                         var domain = domainAndRange.domain;
-                        var d = domain.GetUriFragment();
-                        // foreach (var range in domainAndRange.ranges)
-                        // {       
+                        var dIL = fp.transactions.dataset.classes.ContainsKey(domain) ? 
+                            fp.transactions.dataset.classes[domain] : 
+                            new InstanceLabel(domain, null, null);
+                        result.usedClassInstanceLabel.Add(dIL);
+                        var d = dIL.Label;
                         var range = domainAndRange.range;
                         if (domain.Equals(range)) continue;
-                        var r = range.GetUriFragment();
+                        var rIL = fp.transactions.dataset.classes.ContainsKey(range) ? 
+                            fp.transactions.dataset.classes[range] : 
+                            new InstanceLabel(range, null, null);
+                        result.usedClassInstanceLabel.Add(rIL);
+                        var r = rIL.Label;
                         if (dash)
                             cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
                         else
@@ -182,8 +211,6 @@ namespace LOD_CM_CLI.Uml
                         usedProp.Add(id);
                         classes.Add(domain);
                         classes.Add(range);
-                        // }
-                        // }
                     }
 
                 }
@@ -194,18 +221,26 @@ namespace LOD_CM_CLI.Uml
                     var property = fp.transactions.intToPredicateDict[id];
                     if (fp.transactions.dataset.dataTypeProperties.ContainsKey(property))
                     {
-                        var p = property.GetUriFragment();
+                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
+                            fp.transactions.dataset.properties[property] : 
+                            new InstanceLabel(property, null, null);
+                        result.usedPropInstanceLabel.Add(pIL);
+                        var p = pIL.Label;
                         var datatype = fp.transactions.dataset.dataTypeProperties.GetValueOrDefault(property);
                         var r = datatype.GetUriFragment();
                         cModel.AppendLine(p + ":" + r + " sup=" + propertySupport);
-                        usedProp.Add(id);
+                        usedProp.Add(id);                        
                     }
                 }
                 // third loop for properties without info
                 foreach (var id in mfp.Except(usedProp))
                 {
                     var property = fp.transactions.intToPredicateDict[id];
-                    var p = property.GetUriFragment();
+                    var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
+                        fp.transactions.dataset.properties[property] : 
+                        new InstanceLabel(property, null, null);
+                    result.usedPropInstanceLabel.Add(pIL);
+                    var p = pIL.Label;
                     cModel.AppendLine(p + " sup=" + propertySupport);
                 }
                 cModel.AppendLine("}");
@@ -218,10 +253,18 @@ namespace LOD_CM_CLI.Uml
                 // loop for related classes hierarchy
                 foreach (var classUri in classes)
                 {
-                    var c = classUri.GetUriFragment();
+                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
+                        fp.transactions.dataset.classes[classUri] : 
+                        new InstanceLabel(classUri, null, null);
+                    result.usedClassInstanceLabel.Add(cIL);
+                    var c = cIL.Label;
                     foreach (var superClass in fp.transactions.dataset.superClassesOfClass[classUri])
                     {
-                        var sc = superClass.GetUriFragment();
+                        var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
+                            fp.transactions.dataset.classes[superClass] : 
+                            new InstanceLabel(superClass, null, null);
+                        result.usedClassInstanceLabel.Add(scIL);
+                        var sc = scIL.Label;
                         cModel.AppendLine(sc + " <|-- " + c);
                     }
                 }

@@ -40,12 +40,12 @@ namespace LOD_CM_CLI.Data
                     {
                         this.Label = uri.GetUriFragment().ToCamelCaseAlphaNum();
                     }
-                }                
+                }
             }
             else
             {
                 this.Label = uri.GetUriFragment();
-            }      
+            }
         }
 
         /// <summary>
@@ -61,5 +61,22 @@ namespace LOD_CM_CLI.Data
         /// </summary>
         /// <value></value>
         public string Label { get; set; }
+
+        public override int GetHashCode()
+        {
+            return this.Uri.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            var item = obj as InstanceLabel;
+
+            if (item == null)
+            {
+                return false;
+            }
+
+            return this.Uri.Equals(item.Uri);
+        }
     }
 }

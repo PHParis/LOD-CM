@@ -30,11 +30,7 @@ namespace LOD_CM_CLI
         public static ServiceProvider serviceProvider { get; private set; }
         private static ILogger log;
         static async Task Main(string[] args)
-        {
-            // TODO: check in precomputation that all computation are possible with wkidata
-            // TODO: for each image keep track of used classes and properties
-            // TODO: for each use of GetUriFragment, check if we should use wikidata label equivalent property. otherwise all wikidata property will be in the form 'P31' and we prefer having 'type' which is more human friendly
-            // create a dictionary for InstanceCLass and do the same for properties
+        {            
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
@@ -79,6 +75,8 @@ namespace LOD_CM_CLI
                 dataset.objectProperties = datasetTmp.objectProperties;
                 dataset.superClassesOfClass = datasetTmp.superClassesOfClass;
                 dataset.classesDepths = datasetTmp.classesDepths;
+                dataset.classes = datasetTmp.classes;
+                dataset.properties = datasetTmp.properties;
             }
             else
             {
@@ -90,7 +88,9 @@ namespace LOD_CM_CLI
             if (!dataset.dataTypeProperties.Any() ||
                 !dataset.objectProperties.Any() ||
                 !dataset.superClassesOfClass.Any() ||
-                !dataset.classesDepths.Any())
+                !dataset.classesDepths.Any() ||
+                !dataset.classes.Any() ||
+                !dataset.properties.Any())
                 throw new Exception(@"Something went wrong during precomputation.
                     One of the dataset property is empty!");
 
@@ -101,19 +101,19 @@ namespace LOD_CM_CLI
             }
 
             log.LogInformation("Getting classes...");
-            List<InstanceLabel> classes;
-            var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
-            if (File.Exists(jsonClassListPath))
-            {
-                var content = await File.ReadAllTextAsync(jsonClassListPath);
-                classes = JsonConvert.DeserializeObject<List<InstanceLabel>>(content);
-            }
-            else
-            {
-                classes = await dataset.GetInstanceClasses();
-                var json = JsonConvert.SerializeObject(classes);
-                await File.WriteAllTextAsync(jsonClassListPath, json);
-            }
+            List<InstanceLabel> classes = dataset.classes.Select(x => x.Value).ToList();
+            // var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
+            // if (File.Exists(jsonClassListPath))
+            // {
+            //     var content = await File.ReadAllTextAsync(jsonClassListPath);
+            //     classes = JsonConvert.DeserializeObject<List<InstanceLabel>>(content);
+            // }
+            // else
+            // {
+            //     classes = await dataset.GetInstanceClasses();
+            //     var json = JsonConvert.SerializeObject(classes);
+            //     await File.WriteAllTextAsync(jsonClassListPath, json);
+            // }
 #if DEBUG
             classes = classes.Take(1).ToList();
 #endif
@@ -188,6 +188,9 @@ namespace LOD_CM_CLI
                         // we save the content sended to PlantUML, thus if
                         // a problem occurs, we will be able to regenerate
                         // images.
+                        ig.SaveUsedClassesAndProperties(
+                            Path.Combine(imageFilePath, $"usedClasses_{counter}.json"),
+                            Path.Combine(imageFilePath, $"usedProperties_{counter}.json")).Wait();
                         ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
                         var isDownloadOK = ig.GetImageContent().Result;
                         if (isDownloadOK)
