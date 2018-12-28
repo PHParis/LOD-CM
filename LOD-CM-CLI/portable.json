@@ -1,8 +1,9 @@
 {
   "mainDir": "E:\\download",
   "precomputationOnly": false,
-  "datasets": [
-    {
+  "plantUmlJarPath": "C:\\dev\\dotnet\\LOD-CM\\LOD-CM-CLI\\examples\\plantuml.jar",
+  "LocalGraphvizDotPath": "C:\\Program Files (x86)\\Graphviz2.38\\bin\\dot.exe",
+  "datasets": [{
       "PropertyType": "http://www.wikidata.org/prop/direct/P31",
       "OntologyNameSpace": "http://www.wikidata.org/entity/",
       "hdtFilePath": "E:\\download\\wikidata-20170313-all-BETA.hdt",

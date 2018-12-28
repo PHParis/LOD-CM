@@ -41,7 +41,7 @@ namespace LOD_CM_CLI.Data
             }
             else
             {
-                this.Label = uri.GetUriFragment();
+                this.Label = uri.GetUriFragment().ToCamelCaseAlphaNum();
             }            
         }
 

@@ -9,8 +9,9 @@
     <!-- <PackageReference Include="Accord.MachineLearning" Version="3.8.2-alpha" /> -->
     <PackageReference Include="dotNetRDF" Version="2.2.0-pre0001" />
     <PackageReference Include="HDTDotnet" Version="0.0.1-alpha" />
-    <PackageReference Include="iTernity.plantuml" Version="1.1.0" />
+    <!-- <PackageReference Include="iTernity.plantuml" Version="1.1.0" /> -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="2.2.0" />
+    <PackageReference Include="PlantUml.Net" Version="1.1.33" />
   </ItemGroup>
 </Project>

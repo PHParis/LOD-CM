@@ -10,12 +10,13 @@ using VDS.RDF.Parsing;
 using VDS.RDF.Query;
 using System.Threading.Tasks;
 using System.Text;
-using Iternity.PlantUML;
+// using Iternity.PlantUML;
 using System.Net.Http;
 using LOD_CM_CLI.Utils;
 using LOD_CM_CLI.Mining;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using PlantUml.Net;
 
 namespace LOD_CM_CLI.Uml
 {
@@ -50,6 +51,8 @@ namespace LOD_CM_CLI.Uml
         // /// </summary>
         // private Dictionary<string, HashSet<string>> superClassesOfClass;
         public FrequentPattern<int> fp { get; private set; }
+        public string plantUmlJarPath { get; private set; }
+        public string localGraphvizDotPath { get; private set; }
 
         /// <summary>
         /// Download SVG file content from PlantUML
@@ -59,7 +62,7 @@ namespace LOD_CM_CLI.Uml
         {
             try
             {
-                svgFileContent = await GetImageContent(contentForUml);
+                svgFileContent = await GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
             }
             catch (Exception ex)
             {
@@ -68,15 +71,24 @@ namespace LOD_CM_CLI.Uml
             return false;
         }
 
-        public static async Task<string> GetImageContent(string contentForUml)
-        {
-            var uri = PlantUMLUrl.SVG(contentForUml);
-            string svgFileContent;
-            using (var client = new HttpClient())
+        public static async Task<string> GetImageContent(string contentForUml, string plantUmlJarPath, string localGraphvizDotPath)
+        {            
+            var factory = new RendererFactory();
+            var renderer = factory.CreateRenderer(new PlantUmlSettings
             {
-                svgFileContent = await client.GetStringAsync(uri);
-            }
-            return svgFileContent;
+                RenderingMode = RenderingMode.Local,
+                LocalPlantUmlPath = plantUmlJarPath,
+                LocalGraphvizDotPath = localGraphvizDotPath
+            });
+            var bytes = renderer.Render(contentForUml, OutputFormat.Svg);
+            return System.Text.Encoding.UTF8.GetString(bytes);
+            // var uri = PlantUMLUrl.SVG(contentForUml);
+            // string svgFileContent;
+            // using (var client = new HttpClient())
+            // {
+            //     svgFileContent = await client.GetStringAsync(uri);
+            // }
+            // return svgFileContent;
         }
 
         public async Task SaveImage(string filePath)
@@ -123,7 +135,7 @@ namespace LOD_CM_CLI.Uml
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
             InstanceClass instanceClass, double threshold,
-            FrequentPattern<int> fp, ServiceProvider serviceProvider)
+            FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath)
         {
             var thresholdInt = Convert.ToInt32(threshold * 100);
             var maximalSets = fp.fis.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
@@ -134,6 +146,8 @@ namespace LOD_CM_CLI.Uml
                 var result = new ImageGenerator();
                 result.log = serviceProvider.GetService<ILogger<ImageGenerator>>();
                 result.fp = fp;
+                result.plantUmlJarPath = plantUmlJarPath;
+                result.localGraphvizDotPath = localGraphvizDotPath;
                 finalResults.Add(result);
                 var cModel = new StringBuilder();
 

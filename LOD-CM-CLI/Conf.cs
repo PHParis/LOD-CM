@@ -4,6 +4,8 @@ namespace LOD_CM_CLI
 {
     public class Conf
     {
+        public string LocalGraphvizDotPath { get; set; }
+
         /// <summary>
         /// Directory where files will be saved
         /// </summary>
@@ -19,6 +21,7 @@ namespace LOD_CM_CLI
         /// if false it will run until the end
         /// </summary>
         /// <value></value>
-        public bool precomputationOnly {get;set;}
+        public bool precomputationOnly { get; set; }
+        public string plantUmlJarPath { get; set; }
     }
 }

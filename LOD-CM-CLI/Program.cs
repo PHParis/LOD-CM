@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using HDTDotnet;
-using Iternity.PlantUML;
+// using Iternity.PlantUML;
 using LOD_CM_CLI.Data;
 using LOD_CM_CLI.Mining;
 using LOD_CM_CLI.Uml;
@@ -31,16 +31,15 @@ namespace LOD_CM_CLI
         private static ILogger log;
         static async Task Main(string[] args)
         {
-            // TODO: check ToCamelCaseAlphaNum work
             // TODO: find the property used for labels in wikidata
             // TODO: check how english label are encoded within wikidata (do they end with 'en'?)
             // TODO: for each use of GetUriFragment, check if we should use wikidata label equivalent property. otherwise all wikidata property will be in the form 'P31' and we prefer having 'type' which is more human friendly
-            var test = "Cordillère des Andes";
-            var t2 = test.ToCamelCaseAlphaNum();
+            // TODO: change plantuml
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
             var conf = JsonConvert.DeserializeObject<Conf>(confContent);
+
             var sw = Stopwatch.StartNew();
             foreach (var dataset in conf.datasets)
             {
@@ -50,7 +49,7 @@ namespace LOD_CM_CLI
                     log.LogInformation(dataset.Label);
                     using (var ds = await dataset.LoadHdt())
                     {
-                        await ComputeFpMfpImage(ds, conf.mainDir, conf.precomputationOnly);
+                        await ComputeFpMfpImage(ds, conf.mainDir, conf.precomputationOnly, conf.plantUmlJarPath, conf.LocalGraphvizDotPath);
                     }
                 }
                 catch (Exception ex)
@@ -68,7 +67,7 @@ namespace LOD_CM_CLI
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
 
-        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly)
+        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly, string plantUmlJarPath, string localGraphvizDotPath)
         {
             log.LogInformation("Precomputation...");
             var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label, "dataset.json");
@@ -180,7 +179,7 @@ namespace LOD_CM_CLI
                     fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt")).Wait();
 
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
-                        instanceClass, threshold, fp, serviceProvider).Result;
+                        instanceClass, threshold, fp, serviceProvider, plantUmlJarPath, localGraphvizDotPath).Result;
 
                     var counter = 0;
                     foreach (var ig in igs)
@@ -215,7 +214,7 @@ namespace LOD_CM_CLI
                 try
                 {
                     var contentForUml = await File.ReadAllTextAsync(contentPath);
-                    var svgFileContent = await ImageGenerator.GetImageContent(contentForUml);
+                    var svgFileContent = await ImageGenerator.GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
                     var filePath = contentPath.Replace("plant_", "img_").Replace(".txt", ".svg");
                     await File.WriteAllTextAsync(filePath, svgFileContent);
                 }
