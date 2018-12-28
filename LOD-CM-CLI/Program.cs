@@ -31,10 +31,10 @@ namespace LOD_CM_CLI
         private static ILogger log;
         static async Task Main(string[] args)
         {
-            // TODO: find the property used for labels in wikidata
-            // TODO: check how english label are encoded within wikidata (do they end with 'en'?)
+            // TODO: check in precomputation that all computation are possible with wkidata
+            // TODO: for each image keep track of used classes and properties
             // TODO: for each use of GetUriFragment, check if we should use wikidata label equivalent property. otherwise all wikidata property will be in the form 'P31' and we prefer having 'type' which is more human friendly
-            // TODO: change plantuml
+            // create a dictionary for InstanceCLass and do the same for properties
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
@@ -101,12 +101,12 @@ namespace LOD_CM_CLI
             }
 
             log.LogInformation("Getting classes...");
-            List<InstanceClass> classes;
+            List<InstanceLabel> classes;
             var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
             if (File.Exists(jsonClassListPath))
             {
                 var content = await File.ReadAllTextAsync(jsonClassListPath);
-                classes = JsonConvert.DeserializeObject<List<InstanceClass>>(content);
+                classes = JsonConvert.DeserializeObject<List<InstanceLabel>>(content);
             }
             else
             {
@@ -118,7 +118,7 @@ namespace LOD_CM_CLI
             classes = classes.Take(1).ToList();
 #endif
             var total = classes.Count();
-            log.LogInformation($"# of classes: {total}");            
+            log.LogInformation($"# of classes: {total}");
             var classesProcessedPath = Path.Combine(mainDirectory, dataset.Label, "classesProcessed.txt");
             var classesProcessed = new ConcurrentBag<string>();
             if (File.Exists(classesProcessedPath))
@@ -128,9 +128,9 @@ namespace LOD_CM_CLI
                 {
                     classesProcessed.Add(classProcessed);
                 }
-                log.LogInformation($"# classes processed: {classesProcessed.Count}"); 
-                classes = classes.Where(x => !classesProcessed.Contains(x.Uri)).ToList();total = classes.Count();
-                log.LogInformation($"new # of classes: {total}");  
+                log.LogInformation($"# classes processed: {classesProcessed.Count}");
+                classes = classes.Where(x => !classesProcessed.Contains(x.Uri)).ToList(); total = classes.Count();
+                log.LogInformation($"new # of classes: {total}");
             }
             log.LogInformation("Looping on classes...");
             var count = 0;

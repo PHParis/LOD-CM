@@ -100,7 +100,7 @@ namespace LOD_CM_CLI.Data
         /// </summary>
         /// <param name="instanceClass"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetInstances(InstanceClass instanceClass)
+        public async Task<List<string>> GetInstances(InstanceLabel instanceClass)
         {
             if (!IsOpen) await LoadHdt();
             return hdt.search("", OntologyHelper.PropertyType, instanceClass.Uri)
@@ -166,7 +166,7 @@ namespace LOD_CM_CLI.Data
         /// Return all classes (types)
         /// </summary>
         /// <returns></returns>
-        public async Task<List<InstanceClass>> GetInstanceClasses()
+        public async Task<List<InstanceLabel>> GetInstanceClasses()
         {
             // check if we have an ontology. If yes use it ! If not, use HDT
             if (IsOntologyAvailable)
@@ -174,12 +174,12 @@ namespace LOD_CM_CLI.Data
                 var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
                 var owlClass = ontology.GetUriNode(new Uri(OntologyHelper.OwlClass));
                 return ontology.GetTriplesWithPredicateObject(rdfType, owlClass)
-                    .Select(x => new InstanceClass(x.Subject.ToString(), propertyForLabel, this)).ToList();
+                    .Select(x => new InstanceLabel(x.Subject.ToString(), propertyForLabel, this)).ToList();
             }
             if (!IsOpen) await LoadHdt();
             return hdt.search("", OntologyHelper.PropertyType, "")
                 .Select(x => x.getObject()).Distinct()
-                .Select(x => new InstanceClass(x, propertyForLabel, this)).ToList();
+                .Select(x => new InstanceLabel(x, propertyForLabel, this)).ToList();
             // return classUris.Select(x => new InstanceClass(x)).ToList();
         }
 

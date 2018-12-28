@@ -134,7 +134,7 @@ namespace LOD_CM_CLI.Uml
 
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
-            InstanceClass instanceClass, double threshold,
+            InstanceLabel instanceClass, double threshold,
             FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath)
         {
             var thresholdInt = Convert.ToInt32(threshold * 100);

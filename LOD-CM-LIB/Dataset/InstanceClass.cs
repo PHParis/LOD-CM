@@ -7,7 +7,7 @@ namespace LOD_CM_CLI.Data
     /// <summary>
     /// Contains information about an OWL or RDF class
     /// </summary>
-    public class InstanceClass
+    public class InstanceLabel
     {
         /// <summary>
         /// Use the propertyForLabel property to get label of this instance.
@@ -16,33 +16,36 @@ namespace LOD_CM_CLI.Data
         /// <param name="uri"></param>
         /// <param name="propertyForLabel"></param>
         /// <param name="ds"></param>
-        public InstanceClass(string uri, string propertyForLabel, Dataset ds)
+        public InstanceLabel(string uri, string propertyForLabel, Dataset ds)
         {
             this.Uri = uri;
             if (propertyForLabel != null)
             {
-                throw new NotImplementedException();
                 var labels = ds.GetObjects(uri, propertyForLabel)
                     .Result.Distinct().ToList();
                 if (!labels.Any())
                     this.Label = uri.GetUriFragment();
                 else
                 {
-                    if (labels.Any(x => x.EndsWith("en")))
+                    if (labels.Any(x => x.EndsWith("@en")))
                     {
-                        this.Label = labels.Where(x => x.EndsWith("en")).FirstOrDefault();
+                        this.Label = labels.Where(x => x.EndsWith("@en")).FirstOrDefault();
                     }
                     else
                     {
-                        this.Label = labels.FirstOrDefault();
+                        this.Label = labels.OrderBy(x => x).FirstOrDefault();
                     }
                     this.Label = this.Label.ToCamelCaseAlphaNum();
+                    if (string.IsNullOrWhiteSpace(this.Label))
+                    {
+                        this.Label = uri.GetUriFragment().ToCamelCaseAlphaNum();
+                    }
                 }                
             }
             else
             {
-                this.Label = uri.GetUriFragment().ToCamelCaseAlphaNum();
-            }            
+                this.Label = uri.GetUriFragment();
+            }      
         }
 
         /// <summary>

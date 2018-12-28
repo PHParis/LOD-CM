@@ -12,7 +12,7 @@ namespace LOD_CM_CLI.Mining
     {
         public List<T> domain { get; private set; }
 
-        public InstanceClass instanceClass { get; set; }
+        public InstanceLabel instanceClass { get; set; }
 
         public Dictionary<string, T> predicateToIntDict { get; private set; }
         public Dictionary<T, string> intToPredicateDict { get; private set; }
@@ -49,7 +49,7 @@ namespace LOD_CM_CLI.Mining
         /// </summary>
         /// <param name="dataset"></param>
         /// <returns></returns>
-        public static async Task<TransactionList<T>> GetTransactions(Dataset dataset, InstanceClass instanceClass)
+        public static async Task<TransactionList<T>> GetTransactions(Dataset dataset, InstanceLabel instanceClass)
         {
             var result = new TransactionList<T>();
             if (!dataset.IsOpen)
