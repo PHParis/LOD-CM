@@ -1,6 +1,16 @@
 {
   "mainDir": "E:\\download",
+  "precomputationOnly": false,
   "datasets": [
+    {
+      "PropertyType": "http://www.wikidata.org/prop/direct/P31",
+      "OntologyNameSpace": "http://www.wikidata.org/entity/",
+      "hdtFilePath": "E:\\download\\wikidata-20170313-all-BETA.hdt",
+      "ontologyFilePath": "C:\\dev\\dotnet\\LOD-CM\\LOD-CM-CLI\\examples\\wikidata-taxonomy.nt",
+      "IsOntologyAvailable": true,
+      "Label": "Wikidata",
+      "propertyForLabel": ""
+    },
     {
       "PropertyType": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
       "OntologyNameSpace": "http://dbpedia.org/ontology/",

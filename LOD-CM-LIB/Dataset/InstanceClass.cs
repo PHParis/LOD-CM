@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using LOD_CM_CLI.Utils;
 
 namespace LOD_CM_CLI.Data
@@ -8,11 +9,40 @@ namespace LOD_CM_CLI.Data
     /// </summary>
     public class InstanceClass
     {
-
-        public InstanceClass(string uri)
+        /// <summary>
+        /// Use the propertyForLabel property to get label of this instance.
+        /// If propertyForLabel is null, then use fragment to get the label
+        /// </summary>
+        /// <param name="uri"></param>
+        /// <param name="propertyForLabel"></param>
+        /// <param name="ds"></param>
+        public InstanceClass(string uri, string propertyForLabel, Dataset ds)
         {
             this.Uri = uri;
-            this.Label = uri.GetUriFragment();
+            if (propertyForLabel != null)
+            {
+                throw new NotImplementedException();
+                var labels = ds.GetObjects(uri, propertyForLabel)
+                    .Result.Distinct().ToList();
+                if (!labels.Any())
+                    this.Label = uri.GetUriFragment();
+                else
+                {
+                    if (labels.Any(x => x.EndsWith("en")))
+                    {
+                        this.Label = labels.Where(x => x.EndsWith("en")).FirstOrDefault();
+                    }
+                    else
+                    {
+                        this.Label = labels.FirstOrDefault();
+                    }
+                    this.Label = this.Label.ToCamelCaseAlphaNum();
+                }                
+            }
+            else
+            {
+                this.Label = uri.GetUriFragment();
+            }            
         }
 
         /// <summary>

@@ -14,6 +14,7 @@ using Iternity.PlantUML;
 using LOD_CM_CLI.Data;
 using LOD_CM_CLI.Mining;
 using LOD_CM_CLI.Uml;
+using LOD_CM_CLI.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -30,6 +31,12 @@ namespace LOD_CM_CLI
         private static ILogger log;
         static async Task Main(string[] args)
         {
+            // TODO: check ToCamelCaseAlphaNum work
+            // TODO: find the property used for labels in wikidata
+            // TODO: check how english label are encoded within wikidata (do they end with 'en'?)
+            // TODO: for each use of GetUriFragment, check if we should use wikidata label equivalent property. otherwise all wikidata property will be in the form 'P31' and we prefer having 'type' which is more human friendly
+            var test = "Cordillère des Andes";
+            var t2 = test.ToCamelCaseAlphaNum();
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
@@ -43,7 +50,7 @@ namespace LOD_CM_CLI
                     log.LogInformation(dataset.Label);
                     using (var ds = await dataset.LoadHdt())
                     {
-                        await ComputeFpMfpImage(ds, conf.mainDir);
+                        await ComputeFpMfpImage(ds, conf.mainDir, conf.precomputationOnly);
                     }
                 }
                 catch (Exception ex)
@@ -61,7 +68,7 @@ namespace LOD_CM_CLI
             log.LogInformation(ToPrettyFormat(sw.Elapsed));
         }
 
-        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory)
+        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly)
         {
             log.LogInformation("Precomputation...");
             var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label, "dataset.json");
@@ -88,6 +95,12 @@ namespace LOD_CM_CLI
                 throw new Exception(@"Something went wrong during precomputation.
                     One of the dataset property is empty!");
 
+            if (precomputationOnly)
+            {
+                log.LogInformation("pre-computation only, the program stop here");
+                return;
+            }
+
             log.LogInformation("Getting classes...");
             List<InstanceClass> classes;
             var jsonClassListPath = Path.Combine(mainDirectory, dataset.Label, "classes.json");
@@ -106,7 +119,20 @@ namespace LOD_CM_CLI
             classes = classes.Take(1).ToList();
 #endif
             var total = classes.Count();
-            log.LogInformation($"# classes: {total}");
+            log.LogInformation($"# of classes: {total}");            
+            var classesProcessedPath = Path.Combine(mainDirectory, dataset.Label, "classesProcessed.txt");
+            var classesProcessed = new ConcurrentBag<string>();
+            if (File.Exists(classesProcessedPath))
+            {
+                var lines = await File.ReadAllLinesAsync(classesProcessedPath);
+                foreach (var classProcessed in lines)
+                {
+                    classesProcessed.Add(classProcessed);
+                }
+                log.LogInformation($"# classes processed: {classesProcessed.Count}"); 
+                classes = classes.Where(x => !classesProcessed.Contains(x.Uri)).ToList();total = classes.Count();
+                log.LogInformation($"new # of classes: {total}");  
+            }
             log.LogInformation("Looping on classes...");
             var count = 0;
             // this will be used after the parallel loop to re-download 
@@ -119,6 +145,11 @@ namespace LOD_CM_CLI
 
                 var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
                 log.LogDebug($"transactions computed: {transactions.transactions.Count}");
+                if (!transactions.transactions.Any())
+                {
+                    log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
+                    return;
+                }
                 // ex: ${workingdirectory}/DBpedia/Film
                 var instancePath = Path.Combine(
                     mainDirectory,
@@ -170,9 +201,12 @@ namespace LOD_CM_CLI
                         }
                     }
                 }
+                classesProcessed.Add(instanceClass.Uri);
             }
             );
             log.LogInformation("main loop ended!");
+            log.LogInformation("saving processed classes...");
+            await File.WriteAllLinesAsync(classesProcessedPath, classesProcessed);
             // after the loop we search for images not generated to generate them
             log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
             var finalErrors = new List<string>();

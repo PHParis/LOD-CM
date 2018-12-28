@@ -30,6 +30,13 @@ namespace LOD_CM_CLI.Data
         public bool IsOpen { get; private set; }
 
         /// <summary>
+        /// Property used to find the label of an instance class or a property.
+        /// If null, the fragment will be used
+        /// </summary>
+        /// <value></value>
+        public string propertyForLabel { get; set; }
+
+        /// <summary>
         /// Used to search type of an instance within data (not in ontology).
         /// </summary>
         /// <value></value>
@@ -167,12 +174,12 @@ namespace LOD_CM_CLI.Data
                 var rdfType = ontology.GetUriNode(new Uri(OntologyHelper.PropertyType));
                 var owlClass = ontology.GetUriNode(new Uri(OntologyHelper.OwlClass));
                 return ontology.GetTriplesWithPredicateObject(rdfType, owlClass)
-                    .Select(x => new InstanceClass(x.Subject.ToString())).ToList();
+                    .Select(x => new InstanceClass(x.Subject.ToString(), propertyForLabel, this)).ToList();
             }
             if (!IsOpen) await LoadHdt();
             return hdt.search("", OntologyHelper.PropertyType, "")
                 .Select(x => x.getObject()).Distinct()
-                .Select(x => new InstanceClass(x)).ToList();
+                .Select(x => new InstanceClass(x, propertyForLabel, this)).ToList();
             // return classUris.Select(x => new InstanceClass(x)).ToList();
         }
 
