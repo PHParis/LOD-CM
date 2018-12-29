@@ -121,15 +121,15 @@ namespace LOD_CM_CLI.Uml
         {
             if ("http://www.w3.org/2002/07/owl#Thing".Equals(classUri))
                 yield return string.Empty;
-            else if (!fp.transactions.dataset.superClassesOfClass.ContainsKey(classUri))
+            else if (!fp.transactions.dataset.classesDepths.ContainsKey(classUri))
                 yield return string.Empty;
             else
             {
-                var set = fp.transactions.dataset.superClassesOfClass[classUri];
+                var set = fp.transactions.dataset.classesDepths[classUri];
                 if (!set.Any()) yield return string.Empty;
                 else
                 {
-                    foreach (var superClass in set)
+                    foreach (var superClass in set.Keys)
                     {
                         var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
                             fp.transactions.dataset.classes[classUri] : 
@@ -258,15 +258,19 @@ namespace LOD_CM_CLI.Uml
                         new InstanceLabel(classUri, null, null);
                     result.usedClassInstanceLabel.Add(cIL);
                     var c = cIL.Label;
-                    foreach (var superClass in fp.transactions.dataset.superClassesOfClass[classUri])
+                    if (fp.transactions.dataset.classesDepths.ContainsKey(classUri))
                     {
-                        var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
-                            fp.transactions.dataset.classes[superClass] : 
-                            new InstanceLabel(superClass, null, null);
-                        result.usedClassInstanceLabel.Add(scIL);
-                        var sc = scIL.Label;
-                        cModel.AppendLine(sc + " <|-- " + c);
+                        foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
+                        {
+                            var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
+                                fp.transactions.dataset.classes[superClass] : 
+                                new InstanceLabel(superClass, null, null);
+                            result.usedClassInstanceLabel.Add(scIL);
+                            var sc = scIL.Label;
+                            cModel.AppendLine(sc + " <|-- " + c);
+                        }
                     }
+                    
                 }
                 cModel.AppendLine("@enduml");
                 result.contentForUml = cModel.ToString();

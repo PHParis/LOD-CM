@@ -30,12 +30,20 @@ namespace LOD_CM_CLI
         public static ServiceProvider serviceProvider { get; private set; }
         private static ILogger log;
         static async Task Main(string[] args)
-        {            
+        {
+            // TODO: replace SPARQL code everywhere by DotnetRDF API     
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
             var confContent = await File.ReadAllTextAsync(args[1]);
             var conf = JsonConvert.DeserializeObject<Conf>(confContent);
-
+            var result = await ImageGenerator.GetImageContent(@"@startuml
+            Class01 <|-- Class02
+            Class03 *-- Class04
+            Class05 o-- Class06
+            Class07 .. Class08
+            Class09 -- Class10
+            @enduml", conf.plantUmlJarPath, conf.LocalGraphvizDotPath);
+            log.LogInformation($"Test for UML: {result}");
             var sw = Stopwatch.StartNew();
             foreach (var dataset in conf.datasets)
             {
@@ -66,14 +74,15 @@ namespace LOD_CM_CLI
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly, string plantUmlJarPath, string localGraphvizDotPath)
         {
             log.LogInformation("Precomputation...");
-            var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label, "dataset.json");
-            if (File.Exists(jsonDatasetPath))
+            var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label);
+            Directory.CreateDirectory(jsonDatasetPath);
+            if (File.Exists(Path.Combine(jsonDatasetPath, "dataset.json")))
             {
-                var content = await File.ReadAllTextAsync(jsonDatasetPath);
+                var content = await File.ReadAllTextAsync(Path.Combine(jsonDatasetPath, "dataset.json"));
                 var datasetTmp = JsonConvert.DeserializeObject<Dataset>(content);
                 dataset.dataTypeProperties = datasetTmp.dataTypeProperties;
                 dataset.objectProperties = datasetTmp.objectProperties;
-                dataset.superClassesOfClass = datasetTmp.superClassesOfClass;
+                // dataset.superClassesOfClass = datasetTmp.superClassesOfClass;
                 dataset.classesDepths = datasetTmp.classesDepths;
                 dataset.classes = datasetTmp.classes;
                 dataset.properties = datasetTmp.properties;
@@ -81,13 +90,13 @@ namespace LOD_CM_CLI
             else
             {
                 dataset.Precomputation();
-                log.LogInformation($"Saving after precomputation: {jsonDatasetPath}");
+                log.LogInformation($"Saving after precomputation: {Path.Combine(jsonDatasetPath, "dataset.json")}");
                 var json = JsonConvert.SerializeObject(dataset);
-                await File.WriteAllTextAsync(jsonDatasetPath, json);
+                await File.WriteAllTextAsync(Path.Combine(jsonDatasetPath, "dataset.json"), json);
             }
             if (!dataset.dataTypeProperties.Any() ||
                 !dataset.objectProperties.Any() ||
-                !dataset.superClassesOfClass.Any() ||
+                // !dataset.superClassesOfClass.Any() ||
                 !dataset.classesDepths.Any() ||
                 !dataset.classes.Any() ||
                 !dataset.properties.Any())

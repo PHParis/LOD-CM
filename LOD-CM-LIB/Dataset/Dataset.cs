@@ -56,6 +56,8 @@ namespace LOD_CM_CLI.Data
         public string Label { get; set; }
 
         private IGraph _ontology;
+        public string PropertySubClassOf {get;set;}
+
         public Dictionary<string, InstanceLabel> properties { get; set; }
 
         public Dictionary<string, InstanceLabel> classes { get; set; }
@@ -95,7 +97,7 @@ namespace LOD_CM_CLI.Data
             dataTypeProperties = new Dictionary<string, string>();
             // objectPropertiesRange = new Dictionary<string, HashSet<string>>();
             log = serviceProvider.GetService<ILogger<Dataset>>();
-            superClassesOfClass = new Dictionary<string, HashSet<string>>();
+            // superClassesOfClass = new Dictionary<string, HashSet<string>>();
             classesDepths = new Dictionary<string, Dictionary<string, int>>();
         }
 
@@ -208,14 +210,14 @@ namespace LOD_CM_CLI.Data
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# classes: {classes.Count}");
-            var superClassesOfClassConcurrent = new ConcurrentDictionary<string, HashSet<string>>();
-            // foreach (var @class in classes)
-            Parallel.ForEach(classes.Values, @class =>
-            {
-                var set = FindSuperClasses(@class.Uri, Level.First);
-                superClassesOfClassConcurrent.TryAdd(@class.Uri, set);
-            });
-            superClassesOfClass = superClassesOfClassConcurrent.ToDictionary(x => x.Key, x => x.Value);
+            // var superClassesOfClassConcurrent = new ConcurrentDictionary<string, HashSet<string>>();
+            // // foreach (var @class in classes)
+            // Parallel.ForEach(classes.Values, @class =>
+            // {
+            //     var set = FindSuperClasses(@class.Uri, Level.First);
+            //     superClassesOfClassConcurrent.TryAdd(@class.Uri, set);
+            // });
+            // superClassesOfClass = superClassesOfClassConcurrent.ToDictionary(x => x.Key, x => x.Value);
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
             // TODO: add logger everywhere 
@@ -232,40 +234,97 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"properties done");
         }
 
+        private Dictionary<string, Dictionary<string, int>> ComputeSuperClasses(Dictionary<string, Dictionary<string, int>> dict)
+        {
+            if (!dict.Any()) return dict;
+            var newDict = new Dictionary<string, Dictionary<string, int>>(); // we clone the dictionary, otherwise the loop will fail when hading new items
+            foreach (var classUri in dict.Keys) // for each element in main dictionary
+            {
+                var classDict = dict[classUri];
+                var newClassDict = new Dictionary<string, int>();
+                foreach (var superClassPair in classDict) // get its super classes dict
+                {
+                    if (dict.ContainsKey(superClassPair.Key)) // if its super class is itself recorded in main dict
+                    {
+                        var superClassessOfSuperClass = dict[superClassPair.Key];
+                        foreach (var superClassOfSuperClass in superClassessOfSuperClass)
+                        {
+                            if (!newClassDict.ContainsKey(superClassOfSuperClass.Key)) // and is not present in sub class
+                            {
+                                newClassDict.Add(superClassOfSuperClass.Key, superClassOfSuperClass.Value + 1); // then we had it
+                            }
+                        }
+
+                    }
+                }
+                foreach (var pair in classDict)
+                {
+                    if (!newClassDict.ContainsKey(pair.Key))
+                    {
+                        newClassDict.Add(pair.Key, pair.Value);
+                    }
+                }
+                newDict.Add(classUri, newClassDict);
+            }
+            // we compare size of the clone et of the original to check if there has been modification and if not we recursively start again
+            var cloneSize = newDict.SelectMany(x => x.Value).Count();
+            var originalSize = dict.SelectMany(x => x.Value).Count();
+            if (cloneSize == originalSize)
+                return newDict;
+            else
+                return ComputeSuperClasses(newDict);
+        }
+
         /// <summary>
         /// For each class, we compute relative distances with its super classes
         /// </summary>
         /// <returns></returns>
         private Dictionary<string, Dictionary<string, int>> GetClassesDepth()
         {
-            var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> select ?sub ?super (count(?mid) as ?distance) WHERE { { SELECT DISTINCT ?mid WHERE { ?s rdfs:subClassOf ?mid . } } ?sub rdfs:subClassOf* ?mid . ?mid rdfs:subClassOf+ ?super . } group by ?sub ?super  order by ?sub ?super";
-            var result = new Dictionary<string, Dictionary<string, int>>();
-            var sparqlResultSet = (SparqlResultSet)ontology.ExecuteQuery(query);
-            foreach (var sparqlResult in sparqlResultSet)
+            var dict = ontology.Triples
+                .Where(x => x.Predicate.ToString().Equals(OntologyHelper.PropertySubClassOf))
+                .GroupBy(x => x.Subject.ToString())
+                .ToDictionary(x => x.Key, x => x.ToDictionary(y => y.Object.ToString(), y => 1));
+            if (!dict.Any())
             {
-                var sub = sparqlResult["sub"] as UriNode;
-                var super = sparqlResult["super"] as UriNode;
-                var distance = sparqlResult["distance"] as LiteralNode;
-                int distanceValue;
-                if (!int.TryParse(distance.Value, out distanceValue)) distanceValue = 0;
-                var subUri = sub.Uri.ToString();
-                var superUri = super.Uri.ToString();
-                Dictionary<string, int> dict;
-                if (result.Keys.Contains(subUri))
-                {
-                    dict = result[subUri];
-                }
-                else
-                {
-                    dict = new Dictionary<string, int>();
-                    result.Add(subUri, dict);
-                }
-                if (!dict.Keys.Contains(superUri))
-                {
-                    dict.Add(superUri, distanceValue);
-                }
+                log.LogInformation("We can not use ontology for subclasses.");
+                if (!IsOpen) LoadHdt().Wait();
+                dict = hdt.search("", PropertySubClassOf, "")
+                    .GroupBy(x => x.getSubject())
+                    .ToDictionary(x => x.Key, x => x.ToDictionary(y => y.getObject(), y => 1));
             }
-            return result;
+            log.LogInformation("Recursively compute super classes");
+            dict = ComputeSuperClasses(dict);
+            log.LogInformation("Recursion ended");
+            return dict;
+            // var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> select ?sub ?super (count(?mid) as ?distance) WHERE { { SELECT DISTINCT ?mid WHERE { ?s rdfs:subClassOf ?mid . } } ?sub rdfs:subClassOf* ?mid . ?mid rdfs:subClassOf+ ?super . } group by ?sub ?super  order by ?sub ?super";
+            // var result = new Dictionary<string, Dictionary<string, int>>();
+            // var sparqlResultSet = (SparqlResultSet)ontology.ExecuteQuery(query);
+            // foreach (var sparqlResult in sparqlResultSet)
+            // {
+            //     var sub = sparqlResult["sub"] as UriNode;
+            //     var super = sparqlResult["super"] as UriNode;
+            //     var distance = sparqlResult["distance"] as LiteralNode;
+            //     int distanceValue;
+            //     if (!int.TryParse(distance.Value, out distanceValue)) distanceValue = 0;
+            //     var subUri = sub.Uri.ToString();
+            //     var superUri = super.Uri.ToString();
+            //     Dictionary<string, int> dict;
+            //     if (result.Keys.Contains(subUri))
+            //     {
+            //         dict = result[subUri];
+            //     }
+            //     else
+            //     {
+            //         dict = new Dictionary<string, int>();
+            //         result.Add(subUri, dict);
+            //     }
+            //     if (!dict.Keys.Contains(superUri))
+            //     {
+            //         dict.Add(superUri, distanceValue);
+            //     }
+            // }
+            // return result;
         }
 
         /// <summary>
@@ -277,20 +336,31 @@ namespace LOD_CM_CLI.Data
         /// <returns></returns>
         public HashSet<string> FindSuperClasses(string aClass, Level level)
         {
-            var multipleLevels = level == Level.All ? "*" : string.Empty;
-            var query = @"
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
-                SELECT * WHERE { 
-                    <" + aClass + @"> rdfs:subClassOf" + multipleLevels + @" ?superClass . 
-                }";
-            var results = (SparqlResultSet)ontology.ExecuteQuery(query);
-            var subClasses = new HashSet<string>();
-            foreach (var result in results)
-            {
-                var superclass = result["superClass"].ToString();
-                subClasses.Add(superclass);
-            }
-            return subClasses;
+            if (!classesDepths.ContainsKey(aClass)) return new HashSet<string>();
+            var superClasses = classesDepths[aClass];
+            if (level == Level.First)
+                return new HashSet<string>
+                {
+                    superClasses.Where(x => x.Value == 1).Select(x => x.Key).FirstOrDefault()
+                };
+            return new HashSet<string>
+            (
+                superClasses.Select(x => x.Key)
+            );
+            // var multipleLevels = level == Level.All ? "*" : string.Empty;
+            // var query = @"
+            //     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+            //     SELECT * WHERE { 
+            //         <" + aClass + @"> rdfs:subClassOf" + multipleLevels + @" ?superClass . 
+            //     }";
+            // var results = (SparqlResultSet)ontology.ExecuteQuery(query);
+            // var subClasses = new HashSet<string>();
+            // foreach (var result in results)
+            // {
+            //     var superclass = result["superClass"].ToString();
+            //     subClasses.Add(superclass);
+            // }
+            // return subClasses;
         }
 
         /// <summary>
@@ -471,7 +541,7 @@ namespace LOD_CM_CLI.Data
             Range,
             Domain
         }
-        public Dictionary<string, HashSet<string>> superClassesOfClass { get; set; }
+        // public Dictionary<string, HashSet<string>> superClassesOfClass { get; set; }
 
     }
 }
