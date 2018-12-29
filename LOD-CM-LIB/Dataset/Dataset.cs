@@ -56,7 +56,7 @@ namespace LOD_CM_CLI.Data
         public string Label { get; set; }
 
         private IGraph _ontology;
-        public string PropertySubClassOf {get;set;}
+        public string PropertySubClassOf { get; set; }
 
         public Dictionary<string, InstanceLabel> properties { get; set; }
 
@@ -482,54 +482,77 @@ namespace LOD_CM_CLI.Data
             var objectsTmp = rangeOrDomain == RangeOrDomain.Range ?
                 await GetObjects("", property) :
                 await GetSubjects(property, "");
+            if (!objectsTmp.Any()) return string.Empty;
             // getting all types for each object
-            var typesByObject = objectsTmp.AsParallel().Select(obj =>
+            var typesByObject = objectsTmp
+                .SelectMany(x => hdt.search(x, PropertyType, "").Select(y => y.getObject()))
+                .GroupBy(x => x).Select(x => new { type = x.Key, count = x.Count() })
+                .OrderByDescending(x => x.count).ToList();
+            if (!typesByObject.Any()) return string.Empty;
+            if (typesByObject.Count() == 1) return typesByObject.Select(x => x.type).FirstOrDefault();
+            if (typesByObject.Any(x => x.type.StartsWith(OntologyNameSpace)))
             {
-                var setTmp = GetObjects(obj, PropertyType).Result;
-                return new { subject = obj, setTmp };
-            }).ToDictionary(x => x.subject, x => x.setTmp);
+                var maxCount = typesByObject.Where(x => x.type.StartsWith(OntologyNameSpace)).Max(x => x.count);
+                return GetDeepest(typesByObject.Where(x => x.type.StartsWith(OntologyNameSpace))
+                    .Where(x => x.count == maxCount).Select(x => x.type));
+            }
+            else
+            {
+                var maxCount = typesByObject.Max(x => x.count);
+                return GetDeepest(typesByObject.Where(x => x.count == maxCount).Select(x => x.type));
+            }
+            
+            // .AsParallel().Select(obj =>
+            // {
+            //     var setTmp = GetObjects(obj, PropertyType).Result;
+            //     return new { subject = obj, setTmp };
+            // }).ToDictionary(x => x.subject, x => x.setTmp);
 
-            var useCounter = 0;
-            var typeMap = new Dictionary<string, int>();
-            // computation of the most used type
-            foreach (var entry in typesByObject)
-            {
-                var types = entry.Value.Where(x =>
-                    x.StartsWith(OntologyNameSpace)).ToHashSet();
+            // var orderedTypes = typesByObject.SelectMany(x => x.Value)
+            //     .GroupBy(x => x).Select(x => new { type = x.Key, count = x.Count() })
+            //     .OrderByDescending(x => x.count).ToList();
 
-                foreach (var type in types)
-                {
-                    if (typeMap.ContainsKey(type))
-                    {
-                        var c = typeMap.GetValueOrDefault(type);
-                        c++;
-                        typeMap[type] = c;
-                        if (useCounter < c)
-                            useCounter = c;
-                    }
-                    else
-                    {
-                        typeMap[type] = 1;
-                    }
-                }
-            }
-            // return the deepest used type 
-            if (typeMap.Count(x => x.Value == useCounter) > 1)
-            {
-                // several types are used a lot (i.e. with the same number of use). We must choose the deepest
-                var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
-                    .Select(x => x.Key));
-                return deepest;
-            }
-            if (!typeMap.Any(x => x.Value == useCounter))
-            {// TODO: check if HDT project allow multiple iterator 
-                // FIXME: most of time, the counter get stuck to 0....
-                var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
-                    .Select(x => x.Key));
-                return deepest;
-            }
-            return typeMap.Where(x => x.Value == useCounter)
-                .Select(x => x.Key).FirstOrDefault();
+            // var useCounter = 0;
+            // var typeMap = new Dictionary<string, int>();
+            // // computation of the most used type
+            // foreach (var entry in typesByObject)
+            // {
+            //     var types = entry.Value.Where(x =>
+            //         x.StartsWith(OntologyNameSpace)).ToHashSet();
+
+            //     foreach (var type in types)
+            //     {
+            //         if (typeMap.ContainsKey(type))
+            //         {
+            //             var c = typeMap.GetValueOrDefault(type);
+            //             c++;
+            //             typeMap[type] = c;
+            //             if (useCounter < c)
+            //                 useCounter = c;
+            //         }
+            //         else
+            //         {
+            //             typeMap[type] = 1;
+            //         }
+            //     }
+            // }
+            // // return the deepest used type 
+            // if (typeMap.Count(x => x.Value == useCounter) > 1)
+            // {
+            //     // several types are used a lot (i.e. with the same number of use). We must choose the deepest
+            //     var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
+            //         .Select(x => x.Key));
+            //     return deepest;
+            // }
+            // if (!typeMap.Any(x => x.Value == useCounter))
+            // {// TODO: check if HDT project allow multiple iterator 
+            //     // FIXME: most of time, the counter get stuck to 0....
+            //     var deepest = GetDeepest(typeMap.Where(x => x.Value == useCounter)
+            //         .Select(x => x.Key));
+            //     return deepest;
+            // }
+            // return typeMap.Where(x => x.Value == useCounter)
+            //     .Select(x => x.Key).FirstOrDefault();
         }
         public enum Level
         {
