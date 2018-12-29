@@ -1,0 +1,37 @@
+@page
+@model ConceptualModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h2>Conceptual model for <span>@Model.Dataset.Class</span> class in 
+    <span>@Model.Dataset.Label</pan></h2>
+<p>
+    Current threshold is set to @Model.Dataset.Threshold%, i.e. all properties
+    are present together in at least @Model.Dataset.Threshold% of 
+    @Model.Dataset.Class's instances.
+</p>
+<div class="text-center">
+    <div>
+        @Html.Raw(Model.ImageContent)
+    </div>
+</div>
+<div>
+    <ul id="deletedClasses">
+
+    </ul>
+</div>
+<div>
+    <header>Used group of properties</header>
+    <ul>
+    @foreach (var property in Model.Properties)
+    {
+        <li>@property</li>
+    }
+    </ul>
+</div>
+@section Scripts {    
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+    <script src="lib/contextmenu/jquery.contextMenu.js"></script>
+    <script src="lib/contextmenu/jquery.ui.position.min.js"></script>
+    <link rel="stylesheet" href="lib/contextmenu/jquery.contextMenu.min.css">    
+    <script src="~/js/cm.js" asp-append-version="true"></script>
+}
