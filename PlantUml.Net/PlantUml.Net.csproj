@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <Description>PlantUml.Net is a .Net wrapper for PlantUml</Description>
+    <PackageLicenseUrl>https://github.com/KevReed/PlantUml.Net/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/KevReed/PlantUml.Net</RepositoryUrl>
+  </PropertyGroup>
+
+</Project>

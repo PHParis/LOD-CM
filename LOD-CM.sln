@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LOD-CM", "LOD-CM-WEB\LOD-CM
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LOD-CM-LIB", "LOD-CM-LIB\LOD-CM-LIB.csproj", "{FFD0CC07-6C44-4B1F-8BB8-7D9E37EB5B63}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlantUml.Net", "PlantUml.Net\PlantUml.Net.csproj", "{044FF961-89AB-4657-ABBF-5650D5065D25}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,5 +60,17 @@ Global
 		{FFD0CC07-6C44-4B1F-8BB8-7D9E37EB5B63}.Release|x64.Build.0 = Release|Any CPU
 		{FFD0CC07-6C44-4B1F-8BB8-7D9E37EB5B63}.Release|x86.ActiveCfg = Release|Any CPU
 		{FFD0CC07-6C44-4B1F-8BB8-7D9E37EB5B63}.Release|x86.Build.0 = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|x64.Build.0 = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Debug|x86.Build.0 = Debug|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|x64.ActiveCfg = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|x64.Build.0 = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|x86.ActiveCfg = Release|Any CPU
+		{044FF961-89AB-4657-ABBF-5650D5065D25}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

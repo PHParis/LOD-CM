@@ -34,16 +34,10 @@ namespace LOD_CM_CLI
             // TODO: replace SPARQL code everywhere by DotnetRDF API     
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             Configuration(args[0]);
+            if (!File.Exists(args[1]))
+                throw new FileNotFoundException("You must provide a valid configuration file!");
             var confContent = await File.ReadAllTextAsync(args[1]);
             var conf = JsonConvert.DeserializeObject<Conf>(confContent);
-            var result = await ImageGenerator.GetImageContent(@"@startuml
-            Class01 <|-- Class02
-            Class03 *-- Class04
-            Class05 o-- Class06
-            Class07 .. Class08
-            Class09 -- Class10
-            @enduml", conf.plantUmlJarPath, conf.LocalGraphvizDotPath);
-            log.LogInformation($"Test for UML: {result}");
             var sw = Stopwatch.StartNew();
             foreach (var dataset in conf.datasets)
             {
