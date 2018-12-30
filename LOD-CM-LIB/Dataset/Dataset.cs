@@ -207,6 +207,7 @@ namespace LOD_CM_CLI.Data
                 && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
                 .Select(x => x.Subject.ToString()).Distinct()
+                .AsParallel()
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# classes: {classes.Count}");
@@ -227,6 +228,7 @@ namespace LOD_CM_CLI.Data
                 x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
                 .Select(x => x.Subject.ToString()).Distinct()
+                .AsParallel()
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# properties: {properties.Count}");
