@@ -1,6 +1,6 @@
 {
   "mainDir": "/data2/hamdif/doctorants/ph/xp/lod_cm",
-  "precomputationOnly": true,
+  "precomputationOnly": false,
   "plantUmlJarPath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/plantuml.jar",
   "LocalGraphvizDotPath": "/usr/bin/dot",
   "datasets": [    

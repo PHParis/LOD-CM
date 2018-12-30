@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -18,9 +20,32 @@ namespace LOD_CM.Pages
 
         [HiddenInput]
         public string DatasetLabel { get; private set; }
-        public void OnGet(DatasetForIndex dataset)
+        public async Task OnGetAsync(DatasetForIndex dataset)
         {
             // TODO: display several MFP and let user choose
+            var mainDir = @"E:\download";
+            var directory = Path.Combine(mainDir, dataset.Label, 
+                dataset.Class, dataset.Threshold.ToString());
+            var images = new List<string>();
+            if (Directory.Exists(directory))
+            {
+                var files = Directory.GetFiles(directory);
+                foreach (var file in files)
+                {
+                    if (file.EndsWith("svg"))
+                    {
+                        images.Add(await System.IO.File.ReadAllTextAsync(file));
+                    }
+                    else if (file.EndsWith("json"))
+                    {
+
+                    }
+                    else if (file.Equals("mfp.txt"))
+                    {
+                        
+                    }
+                }
+            }
             // Dataset = dataset;
             ImageContent = @"<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" contentScriptType=""application/ecmascript"" contentStyleType=""text/css"" height=""713px"" preserveAspectRatio=""none"" style=""width:495px;height:713px;"" version=""1.1"" viewBox=""0 0 495 713"" width=""495px"" zoomAndPan=""magnify""><defs>
                 <filter height=""300%"" id=""fufz74as0n034"" width=""300%"" x=""-1"" y=""-1""><feGaussianBlur result=""blurOut"" stdDeviation=""2.0""/><feColorMatrix in=""blurOut"" result=""blurOut2"" type=""matrix"" values=""0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0""/><feOffset dx=""4.0"" dy=""4.0"" in=""blurOut2"" result=""blurOut3""/><feBlend in=""SourceGraphic"" in2=""blurOut3"" mode=""normal""/></filter></defs>

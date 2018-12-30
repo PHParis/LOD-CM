@@ -66,6 +66,7 @@ namespace LOD_CM_CLI.Uml
             try
             {
                 svgFileContent = await GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
+                return !string.IsNullOrWhiteSpace(svgFileContent);
             }
             catch (Exception ex)
             {
@@ -154,10 +155,12 @@ namespace LOD_CM_CLI.Uml
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
             InstanceLabel instanceClass, double threshold,
-            FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath)
+            FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath, 
+            IEnumerable<PatternDiscovery.ItemSet<int>> mfps)
         {
             var thresholdInt = Convert.ToInt32(threshold * 100);
-            var maximalSets = fp.fis.Where(x => x.IsMaximal).OrderByDescending(x => x.Count)
+            var maximalSets = //fp.fis.Where(x => x.IsMaximal)
+                mfps.OrderByDescending(x => x.Count)
                 .ThenByDescending(x => x.TransactionCount).ToList();
             var finalResults = new List<ImageGenerator>();
             foreach (var mfp in maximalSets)

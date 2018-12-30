@@ -33,6 +33,7 @@ namespace LOD_CM_CLI
         {
             // TODO: replace SPARQL code everywhere by DotnetRDF API     
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
+            // dotnet publish -r linux-x64 --self-contained -o LOD-CM-CLI/out -c Release LOD-CM-CLI/LOD-CM-CLI.csproj
             Configuration(args[0]);
             if (!File.Exists(args[1]))
                 throw new FileNotFoundException("You must provide a valid configuration file!");
@@ -163,26 +164,29 @@ namespace LOD_CM_CLI
                 transactions.SaveToFiles(
                     Path.Combine(instancePath, "transactions.txt"),
                     Path.Combine(instancePath, "dictionary.txt")
-                ).Wait();
+                ).Wait();                
+
+                var fp = new FrequentPattern<int>(serviceProvider);
+                fp.GetFrequentPatternV2(transactions, 0.01);
+                fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
+                //fp.ComputeMFP(); // FIXME: we must compute MFP for each threshold
+                // FIXME: saving transactions do not work
 
                 foreach (var thresholdInt in Enumerable.Range(1, 100))
                 {
                     log.LogInformation($"class: {instanceClass.Label} // threshold: {thresholdInt})");
                     var threshold = thresholdInt / 100d;
 
-                    var fp = new FrequentPattern<int>(serviceProvider);
-                    fp.GetFrequentPatternV2(transactions, threshold);
-                    fp.ComputeMFP();
-
                     var imageFilePath = Path.Combine(
                         instancePath,
                         thresholdInt.ToString());
                     Directory.CreateDirectory(imageFilePath);
-                    fp.SaveFP(Path.Combine(imageFilePath, "fp.txt")).Wait();
-                    fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt")).Wait();
-
+                    var mfps = fp.ComputeMFP(threshold).ToList();
+                    fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt"), mfps).Wait();
+                    // fp.SaveDictionary(Path.Combine(imageFilePath, "dict.txt")).Wait();
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
-                        instanceClass, threshold, fp, serviceProvider, plantUmlJarPath, localGraphvizDotPath).Result;
+                        instanceClass, threshold, fp, serviceProvider, 
+                        plantUmlJarPath, localGraphvizDotPath, mfps).Result;
 
                     var counter = 0;
                     foreach (var ig in igs)

@@ -58,12 +58,19 @@ namespace LOD_CM_CLI.Mining
                 fis.Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
             );
         }
-        public async Task SaveMFP(string fpFilePath)
+        public async Task SaveMFP(string fpFilePath, IEnumerable<PatternDiscovery.ItemSet<T>> mfps)
         {
             await File.WriteAllLinesAsync(fpFilePath,
-                fis.Where(x => x.IsMaximal).Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
+                mfps.Select(x => string.Join(" ", x) + " #SUP: " + x.TransactionCount)
             );
         }
+
+        // public async Task SaveDictionary(string dictionaryFilePath)
+        // {
+        //     await File.WriteAllLinesAsync(dictionaryFilePath,
+        //         transactions.intToPredicateDict.Select(x => $"{x.Key} {x.Value}")
+        //     );
+        // }
 
         public PatternDiscovery.ItemSets<T> GetFrequentPatternV2(
             TransactionList<T> transactions, double minSupport)
@@ -99,13 +106,18 @@ namespace LOD_CM_CLI.Mining
         /// </summary>
         /// <param name="rules"></param>
         /// <returns></returns>
-        public void ComputeMFP()
+        public IEnumerable<PatternDiscovery.ItemSet<T>> ComputeMFP(double threshold)
         {
-            var fisSet = fis.Select(x => x.ToHashSet()).ToHashSet();
-            foreach (var itemSet in fis)
+            var fisSet = fis.Where(x => x.Support >= threshold)
+                .Select(x => x.ToHashSet()).ToHashSet();
+            foreach (var itemSet in fis.Where(x => x.Support >= threshold))
             {
                 var set = itemSet.ToHashSet();
-                itemSet.IsMaximal = IsMFP(set, fisSet);
+                if (IsMFP(set, fisSet))
+                {
+                    yield return itemSet;
+                }
+                // itemSet.IsMaximal = IsMFP(set, fisSet);
             }
         }
 

@@ -11,7 +11,7 @@ namespace PatternDiscovery
         protected List<long> mTransactionIDList = new List<long>();
         protected int mDbSize = 0;
         
-        public bool IsMaximal { get; set; }
+        // public bool IsMaximal { get; set; }
 
         public List<long> TransactionIDList
         {
