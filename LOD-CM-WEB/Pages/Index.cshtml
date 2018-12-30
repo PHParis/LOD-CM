@@ -38,7 +38,7 @@
             <option value="">Select a dataset</option>
             @for (int i = 0; i < Model.DatasetNames.Count; i++)
             {
-                <option value="@i">@Model.DatasetNames[i]</option>
+                <option value="@Model.DatasetNames[i]" dsLabel="@i">@Model.DatasetNames[i]</option>
             }
         </select>
         <select asp-for="Dataset.Class" asp-items="@(new SelectList(Model.ClassesNames[0]))">
@@ -67,10 +67,13 @@
         $(document).ready(function () {
             //alert('');  Dataset_Class
             $('#Dataset_Label').on('change', function() {
-                var datasetValue = this.value;
+                var datasetValue = this.value;                
+                var id = $("#Dataset_Label > option[value='" + datasetValue + "']").attr('dsLabel');
+                console.log(datasetValue);
+                console.log(id);
                 if (currendDsId != datasetValue) {
                     currendDsId = datasetValue;
-                    var htmlContent = $("input[classList='" + datasetValue + "']").attr('value');
+                    var htmlContent = $("input[classList='" + id + "']").attr('value');
                     $("#Dataset_Class").html(htmlContent);
                 }
             });
