@@ -38,7 +38,7 @@ namespace LOD_CM_CLI.Mining
             string dictionaryFilePath)
         {
             await File.WriteAllLinesAsync(transactionsFilePath,
-                transactions.Select(x => string.Join(" ", x)));
+                transactions.Select(x => x.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)));
 
             await File.WriteAllLinesAsync(dictionaryFilePath,
                 intToPredicateDict.Select(x => x.Key + " " + x.Value));

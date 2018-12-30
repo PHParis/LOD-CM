@@ -95,6 +95,11 @@ namespace PatternDiscovery
             }
         }
 
+        public override string ToString()
+        {
+            return string.Join(" ", mItems);
+        }
+
         public override bool Equals(object obj)
         {
             Transaction<T> rhs = obj as Transaction<T>;

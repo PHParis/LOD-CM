@@ -169,8 +169,8 @@ namespace LOD_CM_CLI
                 var fp = new FrequentPattern<int>(serviceProvider);
                 fp.GetFrequentPatternV2(transactions, 0.01);
                 fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
-                //fp.ComputeMFP(); // FIXME: we must compute MFP for each threshold
-                // FIXME: saving transactions do not work
+                //fp.ComputeMFP(); // we must compute MFP for each threshold
+                // FIXME: saving transactions do not work, check that there is no spaces
 
                 foreach (var thresholdInt in Enumerable.Range(1, 100))
                 {
