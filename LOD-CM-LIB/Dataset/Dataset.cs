@@ -202,12 +202,13 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"class depth done: {classesDepths.Count}");
             log.LogInformation($"classes...");
             // superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            classes = ontology.Triples.Where(x =>
+            var classesTmp = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
-                .Select(x => x.Subject.ToString()).Distinct()
-                .AsParallel()
+                .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            log.LogInformation($"# of rough classes: {classesTmp.Length}");
+            classes = classesTmp.AsParallel()
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# classes: {classes.Count}");
@@ -222,13 +223,14 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
             // TODO: add logger everywhere 
-            properties = ontology.Triples.Where(x =>
+            var propertiesTmp = ontology.Triples.Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
-                .Select(x => x.Subject.ToString()).Distinct()
-                .AsParallel()
+                .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
+            properties = propertiesTmp.AsParallel()
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# properties: {properties.Count}");
