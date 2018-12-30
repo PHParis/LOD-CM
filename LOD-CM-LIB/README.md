@@ -1,0 +1,1 @@
+This is the core library allowing to process dataset and to output class diagrams.

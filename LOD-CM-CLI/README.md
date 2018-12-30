@@ -1,0 +1,1 @@
+This is the program allowing to process datasets. You can configure datasets in a json file (see examples cnam.json and portable.json).
