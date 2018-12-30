@@ -1,6 +1,6 @@
 var deletedElements = {};
+var svg = {};
 function backupDeletedElement(classeName, deletedElement) {
-    console.log("deletedElement: ", deletedElement[0].outerHTML);
     if (deletedElements[classeName]) {
         deletedElements[classeName].push(deletedElement[0].outerHTML);
     }
@@ -26,20 +26,44 @@ function refreshDeletedElements() {
     });
 }
 
-function restoreDeletedElement(classeName) {
+function restoreDeletedElement(className) {
     // FIXME: restore not working: element are put back but image do not change...
     // Maybe we can save image at the begining, and remove from the list the restored
     // class, and then modify image if there is still deleted classes...
-    for (var element in deletedElements[classeName]) {
-        var elm = deletedElements[classeName][element];
-        console.log("element to restore: ", elm);
-        $("svg > g").append(elm);
+    $('#imageContent').html('');
+    var newContent = svg;
+    for (var classDeleted in deletedElements) {
+        if (classDeleted != className) {
+            for (var i in deletedElements[classDeleted]) {
+                var deletedElement = deletedElements[classDeleted][i];                
+                // console.log(newContent.includes(deletedElement));
+                newContent = newContent.replace(deletedElement, '');
+            }
+        }
     }
-    delete deletedElements[classeName];
+    $('#imageContent').html(newContent);
+    // delete class from deletedElements
+    delete deletedElements[className];
+    // refresh list in view
+    refreshDeletedElements();
+    var remainsElements = false;
+    for (var classDeleted in deletedElements) { remainsElements = true; break; }
+    if (!remainsElements) $("#deletedClassesParent").hide();
+    // for (var element in deletedElements[className]) {
+    //     var elm = deletedElements[className][element];
+    //     console.log("element to restore: ", elm);
+    //     $("svg > g").append(elm);
+    // }
+    // delete deletedElements[className];
 }
+$(document).ready(function () {
+    svg = $("svg")[0].outerHTML;
+    $("#deletedClassesParent").hide();
+    // console.log("svg content: ", svg);
+});
 
 $(document).ready(function () {
-    var currentClass = '@Model.Dataset.Class';
+    var currentClass = $('#ClassName').attr('value');
     $("rect").each(function () {
         if ($(this).attr("id") != currentClass 
             && $(this).attr("id") != 'Thing') {
@@ -56,51 +80,58 @@ $(document).ready(function () {
             selector: '.umlClass', 
             callback: function(key, options) {
                 if (key == 'zoom-in') {
-                    window.location.href = '/ConceptualModel?Label=@Model.Dataset.Label&Class=' 
+                    window.location.href = '/ConceptualModel?Label=' 
+                        + $('#DatasetLabel').attr('value') +'&Class=' 
                         + $(this).attr('id') 
-                        + '&Threshold=@Model.Dataset.Threshold';
+                        + '&Threshold=' + $('#Threshold').attr('value');
                 } 
                 else if (key == 'delete') {
                     // FIXME: there is a bug when deleting Artist
                     var rect = $(this);
-                    var id = rect.attr('id');
+                    var classNameToDelete = rect.attr('id'); // class name to delete
                     $(this).nextUntil('rect').each(function() {
-                        backupDeletedElement(id, $(this));
+                        // if ($(this)[0].nodeType === 8)
+                        //     return false;
+                        var tmpId = $(this).attr('id');
+                        if (tmpId && tmpId.length && !tmpId.includes(classNameToDelete)) 
+                            return false;
+                        backupDeletedElement(classNameToDelete, $(this));
                         $(this).remove();
                     });
-                    $('path[id*="' + id + '-"]').each(function() {
+                    $('path[id*="' + classNameToDelete + '-"]').each(function() {
                         if ($(this).next().is('polygon')) {
                             var next = $(this).next();
-                            backupDeletedElement(id, next);
+                            backupDeletedElement(classNameToDelete, next);
                             next.remove();
                         }                                
                         else if ($(this).next().is('text')) {
                             var next = $(this).next();
-                            backupDeletedElement(id, next);
+                            backupDeletedElement(classNameToDelete, next);
                             next.remove();
                         }
-                        backupDeletedElement(id, $(this));
+                        backupDeletedElement(classNameToDelete, $(this));
                         $(this).remove();
                     });
-                    $('path[id*="-' + id + '"]').each(function() {                                
+                    $('path[id*="-' + classNameToDelete + '"]').each(function() {                                
                         if ($(this).next().is('polygon')) {
                             var next = $(this).next();
-                            backupDeletedElement(id, next);
+                            backupDeletedElement(classNameToDelete, next);
                             next.remove();
                         }
                         else if ($(this).next().is('text')) {
                             var next = $(this).next();
-                            backupDeletedElement(id, next);
+                            backupDeletedElement(classNameToDelete, next);
                             next.remove();
                         }
-                        backupDeletedElement(id, $(this));
+                        backupDeletedElement(classNameToDelete, $(this));
                         $(this).remove();
                     });
-                    backupDeletedElement(id, rect);
+                    backupDeletedElement(classNameToDelete, rect);
                     rect.remove();
 
                     // refresh list of deleted classes
                     refreshDeletedElements();
+                    $("#deletedClassesParent").show();
                 }
             },
             items: {
@@ -111,13 +142,12 @@ $(document).ready(function () {
                     return 'context-menu-icon context-menu-icon-quit';
                 }}
             }
-        });
-
-        //$('.umlClass').on('click', function(e){
-        //    if (this == 'zoom-in') {
-        //       alert($(this).attr('id'));
-        //    }
-        //    // onclick="window.location.href = 'http://www.google.com'"
-        //})    
+        });    
     });
+    
+    $.fn.getComments = function () {
+        return this.contents().map(function () {
+            if (this.nodeType === 8) return this.nodeValue;
+        }).get();
+    }
 }); 

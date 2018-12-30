@@ -59,6 +59,7 @@ namespace LOD_CM.Pages
             //         ThresholdRanges = Enumerable.Range(1, 100).ToList()
             //     }
             // };
+            // TODO: provide real data
             ThresholdRanges = Enumerable.Range(1, 100).ToList();
             DatasetNames = new[] { "DBpedia", "Wikidata" };
             ClassesNames = new[]
