@@ -7,7 +7,7 @@ namespace LOD_CM_CLI.Data
     /// <summary>
     /// Contains information about an OWL or RDF class
     /// </summary>
-    public class InstanceLabel
+    public class InstanceLabel : IComparable
     {
         /// <summary>
         /// Use the propertyForLabel property to get label of this instance.
@@ -77,6 +77,17 @@ namespace LOD_CM_CLI.Data
             }
 
             return this.Uri.Equals(item.Uri);
+        }
+
+        public int CompareTo(object obj)
+        {
+            if (obj == null) return 1;
+
+            InstanceLabel otherInstanceLabel = obj as InstanceLabel;
+            if (otherInstanceLabel != null) 
+                return this.Label.CompareTo(otherInstanceLabel.Label);
+            else
+               throw new ArgumentException("Object is not a InstanceLabel");
         }
     }
 }

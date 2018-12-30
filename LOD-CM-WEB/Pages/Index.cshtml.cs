@@ -1,80 +1,60 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using LOD_CM.Data;
+using LOD_CM_CLI.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Newtonsoft.Json;
 
 namespace LOD_CM.Pages
 {
     public class IndexModel : PageModel
     {
-        public void OnGet()
+        public async Task OnGetAsync()
         {
-            // Datasets = new[]
-            // {
-            //     new Dataset
-            //     {
-            //         Label = "DBpedia",
-            //         Classes = new[]
-            //         {
-            //             "Person",
-            //             "Film"
-            //         },
-            //         ImagesContent = new[]
-            //         {
-            //             ""
-            //         },
-            //         MFPs = new[]
+            ThresholdRanges = Enumerable.Range(1, 100).ToList();
+            DatasetNames = await System.IO.File.ReadAllLinesAsync(
+                Path.Combine(Program.mainDir, "datasets.txt")
+            );
+            ClassesNames = new List<IList<string>>();
+            foreach (var datasetName in DatasetNames)
+            {
+                var dsDir = Path.Combine(Program.mainDir, datasetName);
+                if (Directory.Exists(dsDir))
+                {
+                    var dsInfoContent = await System.IO.File.ReadAllTextAsync(
+                        Path.Combine(dsDir, "dataset.json")
+                    );
+                    var dsInfo = JsonConvert.DeserializeObject<Dataset>(dsInfoContent);
+                    ClassesNames.Add(dsInfo.classes
+                        .Select(x => x.Value.Label)
+                        .OrderBy(x => x)
+                        .ToList());
+                }
+            }
+            #if DEBUG
+            ClassesNames.Add(new[]
+            {
+                "WikiTest1",
+                "WikiTest2"
+            });
+            #endif
+            // ClassesNames = new[]
             //         {
             //             new[]
             //             {
-            //                 new[]
-            //                 {
-            //                     "type",
-            //                     "name"
-            //                 },
-            //                 new[]
-            //                 {
-            //                     "birthPlace",
-            //                     "name"
-            //                 }
+            //                 "Person",
+            //                 "Film"
             //             },
             //             new[]
             //             {
-            //                 new[]
-            //                 {
-            //                     "type",
-            //                     "director"
-            //                 },
-            //                 new[]
-            //                 {
-            //                     "starring",
-            //                     "name"
-            //                 }
-            //             }
-            //         },
-            //         ThresholdRanges = Enumerable.Range(1, 100).ToList()
-            //     }
-            // };
-            // TODO: provide real data
-            ThresholdRanges = Enumerable.Range(1, 100).ToList();
-            DatasetNames = new[] { "DBpedia", "Wikidata" };
-            ClassesNames = new[]
-                    {
-                        new[]
-                        {
-                            "Person",
-                            "Film"
-                        },
-                        new[]
-                        {
-                            "Entity1",
-                            "Entity2"
-                        },
-                    };
+            //                 "Entity1",
+            //                 "Entity2"
+            //             },
+            //         };
         }
 
         [BindProperty]

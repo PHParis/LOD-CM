@@ -7,53 +7,72 @@
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
-    <p>A tool designed to help users of RDF knowledge bases.</p>    
+    <p>A tool designed to help users of RDF knowledge graphs.</p>    
 </div>
 <article>
-    <header>What is LOD-CM?</header>
-    LOD-CM is a tool that produce a Conceptual Model (CM) thanks to a class diagram.
-    It mines maximal frequent patterns (also known as itemset) upon properties used
-    by instances of a given OWL class to build the most appropriate CMs.
-
+    <header class="bold">What is LOD-CM?</header>
+    LOD-CM is a tool that produce a Conceptual Model (CM) thanks to a UML class diagram.
+    It mines maximal frequent patterns (also known as  maximal frequent itemset) upon properties used
+    by instances of a given OWL class to build the most appropriate CMs.<br/>
+    For a given dataset, you can <span class="bold">choose a class</span> among 
+    its classes, then <span class="bold">choose a threshold</span>
+    corresponding to the minimum percentage of instances having a set of properties,
+    and we compute CMs. For each group of properties simultaneously present above the
+    threshold, we create a class diagram.
+    <br/>
+    <br/>
     <h6>But why would I use that?</h6>
 
     <ul>
-        <li>UML class diagrams are easy to read and understand.</li>
-        <li>CMs allow a user to explore dataset without prior knowledge.</li>
-        <li>A user can easily compare two CMs to choose the better suited dataset.</li>
+        <li>UML class diagrams are <span class="italic">easy to read and understand</span>.</li>
+        <li>CMs allow a user to <span class="italic">explore</span> dataset <span class="italic">without prior knowledge</span>.</li>
+        <li>A user can easily <span class="italic">compare</span> two CMs <span class="italic">to choose</span> the better suited dataset.</li>
     </ul>
     
 </article>
 <div>
-    <header>Let's try it!</header>
+    <header class="bold">Let's try it!</header>
     <div asp-validation-summary="All"></div>
     <form method="POST">
-        <!-- <div>Name: <input asp-for="Customer.Name" /></div> -->
-        <select asp-for="Dataset.Label" asp-items="@(new SelectList(Model.DatasetNames))">
+        <select id="Dataset_Label" name="Dataset.Label">
             <option value="">Select a dataset</option>
-        </select> 
+            @for (int i = 0; i < Model.DatasetNames.Count; i++)
+            {
+                <option value="@i">@Model.DatasetNames[i]</option>
+            }
+        </select>
         <select asp-for="Dataset.Class" asp-items="@(new SelectList(Model.ClassesNames[0]))">
             <option value="">Select a class</option>
         </select>
         <select asp-for="Dataset.Threshold" asp-items="@(new SelectList(Model.ThresholdRanges))">
             <option value="">Select a threshold</option>
         </select>
-        <input type="submit" />
+        <input type="submit" value="Let's go!" />
     </form>
 </div>
+@for (int i = 0; i < Model.ClassesNames.Count; i++)
+{
+    var content = @"<option>Select a class</option>";
+    @foreach (var className in Model.ClassesNames[i])
+    {
+        content += $"<option>{className}</option>";
+    }
+    <input type="hidden" classList="@i" value="@content"/>
+}
 
 @section Scripts {
     
     <script type="text/javascript">
+    var currendDsId = 0;
         $(document).ready(function () {
-            //alert('');
-            $(".umlClass").hover(function(){
-                //alert('in');
-                $(this).attr("fill", "#fafa05");
-                //$(this).css("background-color", "yellow");
-            }, function(){
-                $(this).attr("fill", "#FEFECE");
-                //$(this).css("background-color", "pink");
+            //alert('');  Dataset_Class
+            $('#Dataset_Label').on('change', function() {
+                var datasetValue = this.value;
+                if (currendDsId != datasetValue) {
+                    currendDsId = datasetValue;
+                    var htmlContent = $("input[classList='" + datasetValue + "']").attr('value');
+                    $("#Dataset_Class").html(htmlContent);
+                }
             });
         });        
     </script>

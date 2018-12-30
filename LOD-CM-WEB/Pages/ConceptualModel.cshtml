@@ -8,14 +8,36 @@
 <h2>Conceptual model for <span class="important">@Model.ClassName</span> class in 
     <span class="important">@Model.DatasetLabel</pan></h2>
 <p>
-    Current threshold is set to @Model.Threshold%, i.e. all properties
+    Current threshold is set to @Model.Threshold%, i.e. all properties of a group
     are present together in at least @Model.Threshold% of 
     @Model.ClassName's instances.
 </p>
+<br/>
 <div>
-    You can right click on a class to delete from the diagram. You can also zoom-in
-    on a class, i.e. compute the conceptual model of this class with the currently
-    specified threshold.
+    <header class="bold">Select a group of maximal frequent itemset:</header>
+    <p>Each property group is present simultaneously in @Model.Threshold% of instances.</p>    
+    @for (int i = 0; i < Model.properties.Count; i++)
+    {
+        if (i == 0)
+        {
+            @Html.RadioButtonFor(m => m.Selection, i, new { Class = "mfp", Checked = "checked" })
+            @Html.Raw("&nbsp;")
+            @string.Join(", ", Model.properties[i].OrderBy(x => x).Select(x => x.Label)) <br/>
+        }
+        else
+        {
+            @Html.RadioButtonFor(m => m.Selection, i, new { Class = "mfp" })
+            @Html.Raw("&nbsp;")
+            @string.Join(", ", Model.properties[i].OrderBy(x => x).Select(x => x.Label)) <br/>
+        }        
+    }
+</div>
+<br/>
+<div>
+    <span class="bold">Tips:</span> can <span class="important">right</span> click on a class to delete it from the diagram. You can also zoom-in
+    on a class, i.e. compute the conceptual model of the selected class with the currently
+    specified threshold. In this way, you can somehow navigate through the graph, 
+    or more precisely, through its CM.
 </div>
 <div class="text-center">
     <div id="imageContent">
@@ -23,21 +45,18 @@
     </div>
 </div>
 <div id="deletedClassesParent">    
-    <header>Deleted classes</header>
+    <header>Deleted classes:</header>
     Left click on a class name to restore it.
     <ul id="deletedClasses">
 
     </ul>
 </div>
-<div>
-    <header>Used group of properties</header>
-    <ul>
-    @foreach (var property in Model.Properties)
-    {
-        <li>@property</li>
-    }
-    </ul>
-</div>
+@for (int i = 0; i < Model.images.Count; i++)
+{
+    var imgContent = Model.images[i];
+    var id = "svg" + i;
+    @Html.HiddenFor(x => imgContent, new { Class = "svgContent", id = id })
+}
 <input asp-for="ClassName" />
 <input asp-for="Threshold" />
 <input asp-for="DatasetLabel" />
