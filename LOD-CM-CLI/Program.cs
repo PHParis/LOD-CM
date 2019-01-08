@@ -119,7 +119,8 @@ namespace LOD_CM_CLI
             //     await File.WriteAllTextAsync(jsonClassListPath, json);
             // }
 #if DEBUG
-            classes = classes.Take(1).ToList();
+            classes = classes.Where(x => x.Label == "Film").ToList();
+            // classes = classes.Take(1).ToList();
 #endif
             var total = classes.Count();
             log.LogInformation($"# of classes: {total}");
