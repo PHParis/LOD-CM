@@ -25,14 +25,16 @@ namespace LOD_CM.Pages
                 var dsDir = Path.Combine(Program.mainDir, datasetName);
                 if (Directory.Exists(dsDir))
                 {
-                    var dsInfoContent = await System.IO.File.ReadAllTextAsync(
-                        Path.Combine(dsDir, "dataset.json")
-                    );
-                    var dsInfo = JsonConvert.DeserializeObject<Dataset>(dsInfoContent);
-                    ClassesNames.Add(dsInfo.classes
-                        .Select(x => x.Value.Label)
-                        .OrderBy(x => x)
-                        .ToList());
+                    var filePath = Path.Combine(dsDir, "dataset.json");
+                    if (System.IO.File.Exists(filePath))
+                    {                        
+                        var dsInfoContent = await System.IO.File.ReadAllTextAsync(filePath);
+                        var dsInfo = JsonConvert.DeserializeObject<Dataset>(dsInfoContent);
+                        ClassesNames.Add(dsInfo.classes
+                            .Select(x => x.Value.Label)
+                            .OrderBy(x => x)
+                            .ToList());
+                    }
                 }
             }
             #if DEBUG
