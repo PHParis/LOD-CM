@@ -16,11 +16,16 @@ namespace LOD_CM_CLI.Mining
     public class FrequentPattern<T> where T : System.IComparable<T>, IConvertible
     {
         private ILogger log;
-        public TransactionList<T> transactions { get; private set; }
-        public double minSupport { get; private set; }
-        public ItemSets<T> fis { get; private set; }
+        public TransactionList<T> transactions { get; set; }
+        public double minSupport { get; set; }
+        public ItemSets<T> fis { get; set; }
 
         public FrequentPattern(ServiceProvider serviceProvider)
+        {
+            log = serviceProvider.GetService<ILogger<FrequentPattern<T>>>();
+        }
+
+        public void SetServiceProvider(ServiceProvider serviceProvider)
         {
             log = serviceProvider.GetService<ILogger<FrequentPattern<T>>>();
         }

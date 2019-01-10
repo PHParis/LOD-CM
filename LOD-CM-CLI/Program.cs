@@ -147,35 +147,59 @@ namespace LOD_CM_CLI
                 Interlocked.Increment(ref count);
                 log.LogInformation($"class: {instanceClass.Label} ({count}/{total})");
 
-                var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
-                log.LogDebug($"transactions computed: {transactions.transactions.Count}");
-                if (!transactions.transactions.Any())
-                {
-                    log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
-                    return;
-                }
-                // ex: ${workingdirectory}/DBpedia/Film
+                FrequentPattern<int> fp;
                 var instancePath = Path.Combine(
                     mainDirectory,
                     dataset.Label,
                     instanceClass.Label
                 );
                 Directory.CreateDirectory(instancePath);
+                var fpFilePath = Path.Combine(instancePath, "fp.json");
+                var notransactionsFilePath = Path.Combine(instancePath, "NO_TRANSACTIONS.txt"); // used to avoid computing again transactions when there is none to compute!
+                if (File.Exists(fpFilePath)) 
+                {
+                    // fp has already been computed
+                    fp = JsonConvert.DeserializeObject<FrequentPattern<int>>(fpFilePath);
+                    fp.SetServiceProvider(serviceProvider);
+                }
+                if (File.Exists(notransactionsFilePath))
+                {
+                    log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
+                    return;
+                }
+                else
+                {
+                    var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
+                    log.LogDebug($"transactions computed: {transactions.transactions.Count}");
+                    if (!transactions.transactions.Any())
+                    {
+                        log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
+                        File.WriteAllTextAsync(notransactionsFilePath, "").Wait();
+                        return;
+                    }
+                    // ex: ${workingdirectory}/DBpedia/Film
 
-                transactions.SaveToFiles(
-                    Path.Combine(instancePath, "transactions.txt"),
-                    Path.Combine(instancePath, "dictionary.txt")
-                ).Wait();                
+                    transactions.SaveToFiles(
+                        Path.Combine(instancePath, "transactions.txt"),
+                        Path.Combine(instancePath, "dictionary.txt")
+                    ).Wait();                
 
-                var fp = new FrequentPattern<int>(serviceProvider);
-                fp.GetFrequentPatternV2(transactions, 0.01);
-                fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
+                    fp = new FrequentPattern<int>(serviceProvider);
+                    fp.GetFrequentPatternV2(transactions, 0.01);
+                    fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
+                    
+                    var jsonFP = JsonConvert.SerializeObject(fp);
+                    File.WriteAllTextAsync(fpFilePath, jsonFP).Wait();
+                }
+
+                
                 //fp.ComputeMFP(); // we must compute MFP for each threshold
-
-                //foreach (var thresholdInt in Enumerable.Range(1, 100))
-                //{
-                    ///////
-                int  thresholdInt = 90;
+                var thresholdRange = Enumerable.Range(1, 100);
+#if DEBUG
+                thresholdRange = new[] { 82 };
+#endif
+                foreach (var thresholdInt in thresholdRange)
+                {
                     log.LogInformation($"class: {instanceClass.Label} // threshold: {thresholdInt})");
                     var threshold = thresholdInt / 100d;
 
@@ -210,8 +234,8 @@ namespace LOD_CM_CLI
                         {
                             failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         }
-                    }
-                //}
+                      }
+                }
                 classesProcessed.Add(instanceClass.Uri);
             }
             );

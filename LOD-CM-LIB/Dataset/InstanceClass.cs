@@ -10,6 +10,20 @@ namespace LOD_CM_CLI.Data
     public class InstanceLabel : IComparable
     {
         /// <summary>
+        /// The URI of the given class.
+        /// </summary>
+        /// <value></value>
+        public string Uri { get; set; }
+
+        /// <summary>
+        /// The label of the property. It is used to display a human reading
+        /// name in Web interface or to be part of file name.
+        /// It must contain only alpha numeric characters.
+        /// </summary>
+        /// <value></value>
+        public string Label { get; set; }
+        
+        /// <summary>
         /// Use the propertyForLabel property to get label of this instance.
         /// If propertyForLabel is null, then use fragment to get the label
         /// </summary>
@@ -48,19 +62,6 @@ namespace LOD_CM_CLI.Data
             }
         }
 
-        /// <summary>
-        /// The URI of the given class.
-        /// </summary>
-        /// <value></value>
-        public string Uri { get; set; }
-
-        /// <summary>
-        /// The label of the property. It is used to display a human reading
-        /// name in Web interface or to be part of file name.
-        /// It must contain only alpha numeric characters.
-        /// </summary>
-        /// <value></value>
-        public string Label { get; set; }
 
         public override int GetHashCode()
         {
@@ -84,10 +85,10 @@ namespace LOD_CM_CLI.Data
             if (obj == null) return 1;
 
             InstanceLabel otherInstanceLabel = obj as InstanceLabel;
-            if (otherInstanceLabel != null) 
+            if (otherInstanceLabel != null)
                 return this.Label.CompareTo(otherInstanceLabel.Label);
             else
-               throw new ArgumentException("Object is not a InstanceLabel");
+                throw new ArgumentException("Object is not a InstanceLabel");
         }
     }
 }

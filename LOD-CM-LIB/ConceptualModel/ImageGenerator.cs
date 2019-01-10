@@ -130,27 +130,76 @@ namespace LOD_CM_CLI.Uml
                 if (!set.Any()) yield return string.Empty;
                 else
                 {
-                    foreach (var superClass in set.Keys)
-                    {
-                        var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
+                    var closestSuperClass = set.OrderBy(x => x.Value).Select(x => x.Key).First();
+                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
                             fp.transactions.dataset.classes[classUri] : 
                             new InstanceLabel(classUri, null, null);
-                        usedClassInstanceLabel.Add(cIL);
-                        var c = cIL.Label;
-                        var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
-                            fp.transactions.dataset.classes[superClass] : 
-                            new InstanceLabel(superClass, null, null);
-                        usedClassInstanceLabel.Add(scIL);
-                        var sc = scIL.Label;
-                        yield return sc + " <|-- " + c;
-                        foreach (var res in GetAllSuperClasses(superClass))
-                        {
-                            yield return res;
-                        }
+                    usedClassInstanceLabel.Add(cIL);
+                    var c = cIL.Label;
+                    var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ? 
+                        fp.transactions.dataset.classes[closestSuperClass] : 
+                        new InstanceLabel(closestSuperClass, null, null);
+                    usedClassInstanceLabel.Add(scIL);
+                    var sc = scIL.Label;
+                    yield return sc + " <|-- " + c;
+                    foreach (var superSuperClass in GetAllSuperClasses(scIL.Uri))
+                    {
+                        yield return superSuperClass;
                     }
+                    // foreach (var superClass in set.Keys)
+                    // {
+                    //     var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
+                    //         fp.transactions.dataset.classes[classUri] : 
+                    //         new InstanceLabel(classUri, null, null);
+                    //     usedClassInstanceLabel.Add(cIL);
+                    //     var c = cIL.Label;
+                    //     //var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
+                    //         //fp.transactions.dataset.classes[superClass] : 
+                    //         //new InstanceLabel(superClass, null, null);
+                    //     var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
+                    //         fp.transactions.dataset.classes[GetSuperClass(classUri)] : 
+                    //         new InstanceLabel(superClass, null, null);
+                    //     usedClassInstanceLabel.Add(scIL);
+                    //     var sc = scIL.Label;
+                    //     yield return sc + " <|-- " + c;
+                    //     foreach (var res in GetAllSuperClasses(superClass))
+                    //     {
+                    //         yield return res;
+                    //     }
+                    // }
                 }
             }
         }
+
+        // public string GetSuperClass(string classUri)
+        // {
+        //     if ("http://www.w3.org/2002/07/owl#Thing".Equals(classUri))
+        //         return string.Empty;
+        //     else if (!fp.transactions.dataset.classesDepths.ContainsKey(classUri))
+        //         return string.Empty;
+        //     else
+        //     {
+        //         var set = fp.transactions.dataset.classesDepths[classUri];
+        //         var setOne = fp.transactions.dataset.classesDepths[classUri].Values;
+        //         if (!set.Any()) return string.Empty;
+        //         else
+        //         {
+        //             var closestSuperClass = set.OrderBy(x => x.Value).Select(x => x.Key).First();
+        //             var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
+        //                     fp.transactions.dataset.classes[classUri] : 
+        //                     new InstanceLabel(classUri, null, null);
+        //             usedClassInstanceLabel.Add(cIL);
+        //             var c = cIL.Label;
+        //             var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ? 
+        //                 fp.transactions.dataset.classes[closestSuperClass] : 
+        //                 new InstanceLabel(closestSuperClass, null, null);
+        //             usedClassInstanceLabel.Add(scIL);
+        //             var sc = scIL.Label;
+        //             return sc + " <|-- " + c;
+        //         }
+        //     }
+        // }
+
 
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,

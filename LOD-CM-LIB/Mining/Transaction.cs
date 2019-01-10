@@ -10,7 +10,20 @@ namespace PatternDiscovery
     {
         private long mID;
         private static long GlobalID = 0;
-        protected List<T> mItems = new List<T>();
+        protected List<T> mItems { get; set; }
+
+
+        public long ID
+        {
+            get
+            {
+                return mID;
+            }
+            set
+            {
+                mID = value;
+            }
+        }
 
         public virtual bool ContainsItem(T item)
         {
@@ -58,10 +71,12 @@ namespace PatternDiscovery
         public Transaction()
         {
             mID = GlobalID++;
+            mItems = new List<T>();
         }
 
         public Transaction(params T[] items)
         {
+            mItems = new List<T>();
             foreach (T item in items)
             {
                 this.AddItem(item);
@@ -81,18 +96,6 @@ namespace PatternDiscovery
             }
 
             return uniqueItems.ToList();
-        }
-
-        public long ID
-        {
-            get
-            {
-                return mID;
-            }
-            set
-            {
-                mID = value;
-            }
         }
 
         public override string ToString()
