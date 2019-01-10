@@ -1,5 +1,5 @@
 {
-  "mainDir": "E:\\download",
+  "mainDir": "D:\\hdt\\dbpedia\\custom",
   "precomputationOnly": false,
   "plantUmlJarPath": "C:\\dev\\dotnet\\LOD-CM\\LOD-CM-CLI\\examples\\plantuml.jar",
   "LocalGraphvizDotPath": "C:\\Program Files (x86)\\Graphviz2.38\\bin\\dot.exe",
