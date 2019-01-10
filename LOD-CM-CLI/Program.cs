@@ -172,8 +172,10 @@ namespace LOD_CM_CLI
                 fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
                 //fp.ComputeMFP(); // we must compute MFP for each threshold
 
-                foreach (var thresholdInt in Enumerable.Range(1, 100))
-                {
+                //foreach (var thresholdInt in Enumerable.Range(1, 100))
+                //{
+                    ///////
+                int  thresholdInt = 90;
                     log.LogInformation($"class: {instanceClass.Label} // threshold: {thresholdInt})");
                     var threshold = thresholdInt / 100d;
 
@@ -209,7 +211,7 @@ namespace LOD_CM_CLI
                             failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         }
                     }
-                }
+                //}
                 classesProcessed.Add(instanceClass.Uri);
             }
             );

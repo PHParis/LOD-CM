@@ -60,17 +60,24 @@ namespace LOD_CM_CLI.Mining
             result.intToPredicateDict = new Dictionary<T, string>();
             result.transactions = new List<Transaction<T>>();
             result.dataset = dataset;
+            int instanceNumber = 0;
             foreach (var instance in instances)
             {
+                instanceNumber++;
                 var predicates = await dataset.GetPredicates(instance);
                 // transaction of the given instance
                 var currentTransaction = new HashSet<T>();
+                var hasType = false;
                 foreach (var predicate in predicates)
                 {
+
                     T predicateId;
                     if (result.predicateToIntDict.ContainsKey(predicate))
                     {
                         predicateId = result.predicateToIntDict[predicate];
+                        if (predicate.Contains("type"))
+                            hasType = true;
+
                     }
                     else
                     {
@@ -78,9 +85,19 @@ namespace LOD_CM_CLI.Mining
                         predicateId = (T)Convert.ChangeType(result.predicateToIntDict.Count + 1, typeof(T));
                         result.predicateToIntDict[predicate] = predicateId;
                         result.intToPredicateDict[predicateId] = predicate;
+                        if (predicate.Contains("type"))
+                            hasType = true;
                     }
                     currentTransaction.Add(predicateId);
                 }
+                if (!hasType)
+                {
+                    Console.WriteLine(instance + " " + instanceNumber);
+
+                }
+
+
+
                 result.transactions.Add(new Transaction<T>(currentTransaction.ToArray()));
             }
             result.domain = result.intToPredicateDict.Select(x => x.Key).ToList();
