@@ -24,8 +24,8 @@ namespace LOD_CM_CLI.Uml
     public class ImageGenerator
     {
         private ILogger log;
-        public HashSet<InstanceLabel> usedPropInstanceLabel {get;set;}
-        public HashSet<InstanceLabel> usedClassInstanceLabel {get;set;}
+        public HashSet<InstanceLabel> usedPropInstanceLabel { get; set; }
+        public HashSet<InstanceLabel> usedClassInstanceLabel { get; set; }
 
         private ImageGenerator() { }
 
@@ -76,15 +76,17 @@ namespace LOD_CM_CLI.Uml
         }
 
         public static async Task<string> GetImageContent(string contentForUml, string plantUmlJarPath, string localGraphvizDotPath)
-        {            
+        {
             var factory = new RendererFactory();
-            var renderer = factory.CreateRenderer(new PlantUmlSettings
-            {
-                RenderingMode = RenderingMode.Local,
-                LocalPlantUmlPath = plantUmlJarPath,
-                LocalGraphvizDotPath = localGraphvizDotPath
-            });
-            var bytes = renderer.Render(contentForUml, OutputFormat.Svg);
+            // var renderer = factory.CreateRenderer(new PlantUmlSettings
+            // {
+            //     RenderingMode = RenderingMode.Local,
+            //     LocalPlantUmlPath = plantUmlJarPath,
+            //     LocalGraphvizDotPath = localGraphvizDotPath
+            // });
+            var renderer = factory.CreateRenderer();
+
+            var bytes = await Task.Run<byte[]>(() => renderer.Render(contentForUml, OutputFormat.Svg));//renderer.Render(contentForUml, OutputFormat.Svg);
             return System.Text.Encoding.UTF8.GetString(bytes);
             // var uri = PlantUMLUrl.SVG(contentForUml);
             // string svgFileContent;
@@ -131,13 +133,13 @@ namespace LOD_CM_CLI.Uml
                 else
                 {
                     var closestSuperClass = set.OrderBy(x => x.Value).Select(x => x.Key).First();
-                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
-                            fp.transactions.dataset.classes[classUri] : 
+                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
+                            fp.transactions.dataset.classes[classUri] :
                             new InstanceLabel(classUri, null, null);
                     usedClassInstanceLabel.Add(cIL);
                     var c = cIL.Label;
-                    var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ? 
-                        fp.transactions.dataset.classes[closestSuperClass] : 
+                    var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ?
+                        fp.transactions.dataset.classes[closestSuperClass] :
                         new InstanceLabel(closestSuperClass, null, null);
                     usedClassInstanceLabel.Add(scIL);
                     var sc = scIL.Label;
@@ -204,7 +206,7 @@ namespace LOD_CM_CLI.Uml
 
         public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
             InstanceLabel instanceClass, double threshold,
-            FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath, 
+            FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath,
             IEnumerable<PatternDiscovery.ItemSet<int>> mfps)
         {
             var thresholdInt = Convert.ToInt32(threshold * 100);
@@ -224,6 +226,7 @@ namespace LOD_CM_CLI.Uml
 
                 cModel.AppendLine("@startuml");
                 cModel.AppendLine("skinparam linetype ortho");
+                var duplicate = new HashSet<string>();
 
                 var propertySupport = Convert.ToInt32(mfp.Support * 100);
                 var usedProp = new HashSet<int>();
@@ -236,7 +239,7 @@ namespace LOD_CM_CLI.Uml
                     var property = fp.transactions.intToPredicateDict[id];
                     if (fp.transactions.dataset.objectProperties.ContainsKey(property))
                     {
-                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
+                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ?
                             fp.transactions.dataset.properties[property] :
                             new InstanceLabel(property, null, null);
                         result.usedPropInstanceLabel.Add(pIL);
@@ -244,22 +247,28 @@ namespace LOD_CM_CLI.Uml
                         var domainAndRange = fp.transactions.dataset.objectProperties[property];
                         var dash = domainAndRange.dash;
                         var domain = domainAndRange.domain;
-                        var dIL = fp.transactions.dataset.classes.ContainsKey(domain) ? 
-                            fp.transactions.dataset.classes[domain] : 
+                        var dIL = fp.transactions.dataset.classes.ContainsKey(domain) ?
+                            fp.transactions.dataset.classes[domain] :
                             new InstanceLabel(domain, null, null);
                         result.usedClassInstanceLabel.Add(dIL);
                         var d = dIL.Label;
                         var range = domainAndRange.range;
                         if (domain.Equals(range)) continue;
-                        var rIL = fp.transactions.dataset.classes.ContainsKey(range) ? 
-                            fp.transactions.dataset.classes[range] : 
+                        var rIL = fp.transactions.dataset.classes.ContainsKey(range) ?
+                            fp.transactions.dataset.classes[range] :
                             new InstanceLabel(range, null, null);
                         result.usedClassInstanceLabel.Add(rIL);
                         var r = rIL.Label;
+                        string strToAdd;
                         if (dash)
-                            cModel.AppendLine(d + " .. " + r + " : " + p + " sup:" + propertySupport);
+                            strToAdd = d + " .. " + r + " : " + p + " sup:" + propertySupport;
                         else
-                            cModel.AppendLine(d + " -- " + r + " : " + p + " sup:" + propertySupport);
+                            strToAdd = d + " -- " + r + " : " + p + " sup:" + propertySupport;
+                        if (!duplicate.Contains(strToAdd))
+                        {
+                            cModel.AppendLine(strToAdd);
+                            duplicate.Add(strToAdd);
+                        }
                         usedProp.Add(id);
                         classes.Add(domain);
                         classes.Add(range);
@@ -273,40 +282,53 @@ namespace LOD_CM_CLI.Uml
                     var property = fp.transactions.intToPredicateDict[id];
                     if (fp.transactions.dataset.dataTypeProperties.ContainsKey(property))
                     {
-                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
-                            fp.transactions.dataset.properties[property] : 
+                        var pIL = fp.transactions.dataset.properties.ContainsKey(property) ?
+                            fp.transactions.dataset.properties[property] :
                             new InstanceLabel(property, null, null);
                         result.usedPropInstanceLabel.Add(pIL);
                         var p = pIL.Label;
                         var datatype = fp.transactions.dataset.dataTypeProperties.GetValueOrDefault(property);
                         var r = datatype.GetUriFragment();
-                        cModel.AppendLine(p + ":" + r + " sup=" + propertySupport);
-                        usedProp.Add(id);                        
+                        var strToAdd = p + ":" + r + " sup=" + propertySupport;
+                        if (!duplicate.Contains(strToAdd))
+                        {
+                            cModel.AppendLine(strToAdd);
+                            duplicate.Add(strToAdd);
+                        }
+                        usedProp.Add(id);
                     }
                 }
                 // third loop for properties without info
                 foreach (var id in mfp.Except(usedProp))
                 {
                     var property = fp.transactions.intToPredicateDict[id];
-                    var pIL = fp.transactions.dataset.properties.ContainsKey(property) ? 
-                        fp.transactions.dataset.properties[property] : 
+                    var pIL = fp.transactions.dataset.properties.ContainsKey(property) ?
+                        fp.transactions.dataset.properties[property] :
                         new InstanceLabel(property, null, null);
                     result.usedPropInstanceLabel.Add(pIL);
                     var p = pIL.Label;
-                    cModel.AppendLine(p + " sup=" + propertySupport);
+                    var strToAdd = p + " sup=" + propertySupport;
+                    if (!duplicate.Contains(strToAdd))
+                    {
+                        cModel.AppendLine(strToAdd);
+                        duplicate.Add(strToAdd);
+                    }
                 }
                 cModel.AppendLine("}");
                 // loop for current class hierarchy
                 foreach (var line in result.GetAllSuperClasses(instanceClass.Uri))
                 {
-                    if (!string.IsNullOrWhiteSpace(line))
+                    if (!string.IsNullOrWhiteSpace(line) && !duplicate.Contains(line))
+                    {
                         cModel.AppendLine(line);
+                        duplicate.Add(line);
+                    }
                 }
                 // loop for related classes hierarchy
                 foreach (var classUri in classes)
                 {
-                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ? 
-                        fp.transactions.dataset.classes[classUri] : 
+                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
+                        fp.transactions.dataset.classes[classUri] :
                         new InstanceLabel(classUri, null, null);
                     result.usedClassInstanceLabel.Add(cIL);
                     var c = cIL.Label;
@@ -314,15 +336,20 @@ namespace LOD_CM_CLI.Uml
                     {
                         foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
                         {
-                            var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ? 
-                                fp.transactions.dataset.classes[superClass] : 
+                            var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ?
+                                fp.transactions.dataset.classes[superClass] :
                                 new InstanceLabel(superClass, null, null);
                             result.usedClassInstanceLabel.Add(scIL);
                             var sc = scIL.Label;
-                            cModel.AppendLine(sc + " <|-- " + c);
+                            var strToAdd = sc + " <|-- " + c;
+                            if (!duplicate.Contains(strToAdd))
+                            {
+                                cModel.AppendLine(strToAdd);
+                                duplicate.Add(strToAdd);
+                            }
                         }
                     }
-                    
+
                 }
                 cModel.AppendLine("@enduml");
                 result.contentForUml = cModel.ToString();

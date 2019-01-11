@@ -20,6 +20,10 @@ namespace LOD_CM_CLI.Mining
         public double minSupport { get; set; }
         public ItemSets<T> fis { get; set; }
 
+        public FrequentPattern()
+        {
+        }
+
         public FrequentPattern(ServiceProvider serviceProvider)
         {
             log = serviceProvider.GetService<ILogger<FrequentPattern<T>>>();

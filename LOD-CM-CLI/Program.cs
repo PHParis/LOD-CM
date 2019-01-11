@@ -33,7 +33,7 @@ namespace LOD_CM_CLI
         {
             // TODO: replace SPARQL code everywhere by DotnetRDF API     
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
-            // dotnet publish -r linux-x64 --self-contained -o LOD-CM-CLI/out -c Release LOD-CM-CLI/LOD-CM-CLI.csproj
+            // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI/LOD-CM-CLI.csproj
             Configuration(args[0]);
             if (!File.Exists(args[1]))
                 throw new FileNotFoundException("You must provide a valid configuration file!");
@@ -63,7 +63,7 @@ namespace LOD_CM_CLI
                 }
             }
             sw.Stop();
-            log.LogInformation(ToPrettyFormat(sw.Elapsed));
+            log.LogInformation(sw.Elapsed.ToPrettyFormat());
         }
 
         public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly, string plantUmlJarPath, string localGraphvizDotPath)
@@ -141,7 +141,7 @@ namespace LOD_CM_CLI
             var count = 0;
             // this will be used after the parallel loop to re-download 
             // images when a problems occurred
-            var failedContentForUmlPath = new ConcurrentBag<string>();
+            // var failedContentForUmlPath = new ConcurrentBag<string>();
             Parallel.ForEach(classes, instanceClass =>
             {
                 Interlocked.Increment(ref count);
@@ -159,10 +159,11 @@ namespace LOD_CM_CLI
                 if (File.Exists(fpFilePath)) 
                 {
                     // fp has already been computed
-                    fp = JsonConvert.DeserializeObject<FrequentPattern<int>>(fpFilePath);
+                    var jsonContent = File.ReadAllText(fpFilePath);
+                    fp = JsonConvert.DeserializeObject<FrequentPattern<int>>(jsonContent);
                     fp.SetServiceProvider(serviceProvider);
                 }
-                if (File.Exists(notransactionsFilePath))
+                else if (File.Exists(notransactionsFilePath))
                 {
                     log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
                     return;
@@ -225,15 +226,15 @@ namespace LOD_CM_CLI
                             Path.Combine(imageFilePath, $"usedClasses_{counter}.json"),
                             Path.Combine(imageFilePath, $"usedProperties_{counter}.json")).Wait();
                         ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
-                        var isDownloadOK = ig.GetImageContent().Result;
-                        if (isDownloadOK)
-                        {
-                            ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
-                        }
-                        else
-                        {
-                            failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
-                        }
+                        // var isDownloadOK = ig.GetImageContent().Result;
+                        // if (isDownloadOK)
+                        // {
+                        //     ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
+                        // }
+                        // else
+                        // {
+                        //     failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
+                        // }
                       }
                 }
                 classesProcessed.Add(instanceClass.Uri);
@@ -242,50 +243,32 @@ namespace LOD_CM_CLI
             log.LogInformation("main loop ended!");
             log.LogInformation("saving processed classes...");
             await File.WriteAllLinesAsync(classesProcessedPath, classesProcessed);
-            // after the loop we search for images not generated to generate them
-            log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
-            var finalErrors = new List<string>();
-            foreach (var contentPath in failedContentForUmlPath)
-            {
-                try
-                {
-                    var contentForUml = await File.ReadAllTextAsync(contentPath);
-                    var svgFileContent = await ImageGenerator.GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
-                    var filePath = contentPath.Replace("plant_", "img_").Replace(".txt", ".svg");
-                    await File.WriteAllTextAsync(filePath, svgFileContent);
-                }
-                catch (Exception ex)
-                {
-                    finalErrors.Add(contentPath);
-                    log.LogError($"{ex}");
-                }
-            }
-            await File.WriteAllLinesAsync(Path.Combine(
-                mainDirectory,
-                dataset.Label,
-                "imagesInError.txt"
-            ), finalErrors);
+            // // after the loop we search for images not generated to generate them
+            // log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
+            // var finalErrors = new List<string>();
+            // foreach (var contentPath in failedContentForUmlPath)
+            // {
+            //     try
+            //     {
+            //         var contentForUml = await File.ReadAllTextAsync(contentPath);
+            //         var svgFileContent = await ImageGenerator.GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
+            //         var filePath = contentPath.Replace("plant_", "img_").Replace(".txt", ".svg");
+            //         await File.WriteAllTextAsync(filePath, svgFileContent);
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         finalErrors.Add(contentPath);
+            //         log.LogError($"{ex}");
+            //     }
+            // }
+            // await File.WriteAllLinesAsync(Path.Combine(
+            //     mainDirectory,
+            //     dataset.Label,
+            //     "imagesInError.txt"
+            // ), finalErrors);
         }
 
-        public static string ToPrettyFormat(TimeSpan span)
-        {
-
-            if (span == TimeSpan.Zero) return "0 minutes";
-
-            var sb = new StringBuilder();
-            if (span.Days > 0)
-                sb.AppendFormat("{0} day{1} ", span.Days, span.Days > 1 ? "s" : String.Empty);
-            if (span.Hours > 0)
-                sb.AppendFormat("{0} hour{1} ", span.Hours, span.Hours > 1 ? "s" : String.Empty);
-            if (span.Minutes > 0)
-                sb.AppendFormat("{0} minute{1} ", span.Minutes, span.Minutes > 1 ? "s" : String.Empty);
-            if (span.Seconds > 0)
-                sb.AppendFormat("{0} second{1} ", span.Seconds, span.Seconds > 1 ? "s" : String.Empty);
-            if (span.Milliseconds > 0)
-                sb.AppendFormat("{0} millisecond{1} ", span.Milliseconds, span.Milliseconds > 1 ? "s" : String.Empty);
-            return sb.ToString();
-
-        }
+        
         private static void Configuration(string configurationFilePath)
         {
             if (!File.Exists(configurationFilePath))

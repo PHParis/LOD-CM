@@ -12,6 +12,12 @@
     are present together in at least @Model.Threshold% of 
     @Model.ClassName's instances.
 </p>
+<div>
+    @if (!string.IsNullOrWhiteSpace(@Model.ErrorMessage))
+    {
+        Html.Raw(@Model.ErrorMessage);
+    }
+</div>
 <br/>
 <div>
     <header class="bold">Select a group of maximal frequent itemset:</header>

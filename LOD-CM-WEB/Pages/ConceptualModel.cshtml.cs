@@ -7,6 +7,7 @@ using System.Linq;
 using LOD_CM_CLI.Data;
 using Newtonsoft.Json;
 using System;
+using LOD_CM_CLI;
 
 namespace LOD_CM.Pages
 {
@@ -33,9 +34,9 @@ namespace LOD_CM.Pages
         public int Selection { get; private set; }
         public async Task OnGetAsync(DatasetForIndex dataset)
         {
-            // TODO: display several MFP and let user choose
+            ErrorMessage = string.Empty;
             Selection = 0;
-            var mainDir = Program.mainDir;//@"E:\download";
+            var mainDir = Program.mainDir;
             var classDir = Path.Combine(mainDir, dataset.Label,
                 dataset.Class);
             var directory = Path.Combine(classDir, dataset.Threshold.ToString());
@@ -45,58 +46,51 @@ namespace LOD_CM.Pages
                     new { id = Convert.ToInt32(array[0]), uri = array[1] })
                 .ToDictionary(x => x.id, x => x.uri);
             images = new List<string>();
-            // classes = new List<HashSet<InstanceLabel>>();
             properties = new List<HashSet<InstanceLabel>>();
-            // mfpsList = new List<List<(string[] props, int supp)>>();
             if (Directory.Exists(directory))
             {
                 var files = Directory.GetFiles(directory);
                 foreach (var file in files.OrderBy(x => x))
                 {
-                    if (file.EndsWith("svg"))
+                    if (file.Contains("plant_"))
                     {
-                        var imageContent = (await System.IO.File.ReadAllTextAsync(file)).Replace(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""no""?>", string.Empty);
+                        var imagePath = file.Replace("plant_", "img_").Replace(".txt", ".svg");
+                        if (!System.IO.File.Exists(imagePath))
+                        {
+                            // if image doesn't exist, we must create it before retrieving its content!
+                            try
+                            {
+                                var contentForUml = await System.IO.File.ReadAllTextAsync(file);
+                                #if DEBUG
+                                var sw = System.Diagnostics.Stopwatch.StartNew();
+                                #endif
+                                var svgFileContent = await LOD_CM_CLI.Uml.ImageGenerator.GetImageContent(contentForUml, Program.plantUmlJarPath, Program.localGraphvizDotPath);
+                                #if DEBUG
+                                sw.Stop();
+                                System.Console.WriteLine(sw.Elapsed.ToPrettyFormat());
+                                #endif
+                                await System.IO.File.WriteAllTextAsync(imagePath, svgFileContent);
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorMessage += ex;
+                            }
+                        }
+                        var imageContent = (await System.IO.File.ReadAllTextAsync(imagePath)).Replace(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""no""?>", string.Empty);
                         images.Add(imageContent);
                     }
-                    // else if (file.EndsWith("json") && file.Contains("usedClasses_"))
-                    // {
-                    //     var json = await System.IO.File.ReadAllTextAsync(file);
-                    //     var cls = JsonConvert.DeserializeObject<HashSet<InstanceLabel>>(json);
-                    //     classes.Add(cls);
-                    // }
                     else if (file.EndsWith("json") && file.Contains("usedProperties_"))
                     {
                         var json = await System.IO.File.ReadAllTextAsync(file);
                         var props = JsonConvert.DeserializeObject<HashSet<InstanceLabel>>(json);
                         properties.Add(props);
                     }
-                    // else if (file.EndsWith("mfp.txt"))
-                    // {
-                    //     var content = await System.IO.File.ReadAllLinesAsync(file);
-                    //     var mfps = new List<(string[] props, int supp)>();
-                    //     foreach (var line in content.Where(x => !string.IsNullOrWhiteSpace(x)))
-                    //     {
-                    //         var array = line.Split(" #SUP: ", StringSplitOptions.RemoveEmptyEntries);
-                    //         if (array.Length != 2) continue;
-                    //         var support = Convert.ToInt32(array[1]);
-                    //         var mfp = array[0].Split(" ", StringSplitOptions.RemoveEmptyEntries).Select(x =>
-                    //             Convert.ToInt32(x)).ToArray();
-                    //         mfps.Add((mfp.Select(x => dictionary[x]).ToArray(), support));
-                    //     }
-                    //     mfpsList.Add(mfps);
-                    // }
                 }
+                ImageContent = images.FirstOrDefault();
+                ClassName = dataset.Class;
+                Threshold = dataset.Threshold;
+                DatasetLabel = dataset.Label;
             }
-            // Dataset = dataset;
-            ImageContent = images.First();
-            // Properties = new[]
-            // {
-            //     "type", "director"
-            // };
-            ErrorMessage = null;//$"Label: {dataset.Label} // Class: {dataset.Class} // Threshold: {dataset.Threshold}";
-            ClassName = dataset.Class;
-            Threshold = dataset.Threshold;
-            DatasetLabel = dataset.Label;
         }
     }
 }
