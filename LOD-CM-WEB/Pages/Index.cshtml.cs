@@ -11,10 +11,14 @@ using Newtonsoft.Json;
 
 namespace LOD_CM.Pages
 {
+    
     public class IndexModel : PageModel
     {
+        
         public async Task OnGetAsync()
-        {
+        {     
+            
+
             ThresholdRanges = Enumerable.Range(1, 100).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
                 Path.Combine(Program.mainDir, "datasets.txt")

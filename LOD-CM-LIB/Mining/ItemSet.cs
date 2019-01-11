@@ -2,60 +2,48 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
 
 namespace PatternDiscovery
 {
+    [JsonObject]
     public class ItemSet<T> : List<T>
         where T : IComparable<T>
     {
-        protected List<long> mTransactionIDList = new List<long>();
-        protected int mDbSize = 0;
-        
+        //protected List<long> mTransactionIDList = new List<long>();
+        //protected int mDbSize = 0;
+
         // public bool IsMaximal { get; set; }
 
-        public List<long> TransactionIDList
-        {
-            get { return mTransactionIDList; }
-        }
+        [JsonProperty]
+        public List<T> TransactionIDList { get; set; } = new List<T>();
 
-        public int DbSize
-        {
-            get { return mDbSize; }
-            set { mDbSize = value; }
-        }
-
+        [JsonProperty]
+        public int DbSize { get; set; } = 0;
+        [JsonIgnore]
         public double Support
         {
             get
             {
-                return mDbSize == 0 ? 0 : (double)mTransactionCount / mDbSize;
+                return DbSize == 0 ? 0 : (double)TransactionCount / DbSize;
             }
         }
 
-        protected int mTransactionCount = 0;
-        public int TransactionCount
-        {
-            get
-            {
-                return mTransactionCount;
-            }
-            set
-            {
-                mTransactionCount = value;
-            }
-        }
+        //protected int mTransactionCount = 0;
+        [JsonProperty]
+        public int TransactionCount { get; set; } = 0;
 
         public virtual ItemSet<T> Clone()
         {
             ItemSet<T> clone = new ItemSet<T>();
-            clone.mTransactionCount = mTransactionCount;
+            clone.TransactionCount = TransactionCount;
             for (int i = 0; i < Count; ++i)
             {
                 clone.Add(this[i]);
             }
-            for (int i = 0; i < mTransactionIDList.Count; ++i)
+            for (int i = 0; i < TransactionIDList.Count; ++i)
             {
-                long id = mTransactionIDList[i];
+                var id = TransactionIDList[i];
                 clone.TransactionIDList.Add(id);
             }
             return clone;
@@ -63,7 +51,8 @@ namespace PatternDiscovery
 
         public override bool Equals(object obj)
         {
-            ItemSet<T> rhs = obj as ItemSet<T>;
+            if (!(obj is ItemSet<T>)) return false;
+            var rhs = obj as ItemSet<T>;
             if (Count != rhs.Count) return false;
 
             for (int i = 0; i < rhs.Count; ++i)

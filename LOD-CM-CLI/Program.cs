@@ -119,12 +119,15 @@ namespace LOD_CM_CLI
             //     await File.WriteAllTextAsync(jsonClassListPath, json);
             // }
 #if DEBUG
-            classes = classes.Where(x => x.Label == "Film").ToList();
+            classes = classes.Where(x => x.Label == "AmericanFootballTeam").ToList();
             // classes = classes.Take(1).ToList();
 #endif
             var total = classes.Count();
             log.LogInformation($"# of classes: {total}");
             var classesProcessedPath = Path.Combine(mainDirectory, dataset.Label, "classesProcessed.txt");
+#if DEBUG
+            File.Delete(classesProcessedPath);
+#endif
             var classesProcessed = new ConcurrentBag<string>();
             if (File.Exists(classesProcessedPath))
             {
@@ -134,7 +137,8 @@ namespace LOD_CM_CLI
                     classesProcessed.Add(classProcessed);
                 }
                 log.LogInformation($"# classes processed: {classesProcessed.Count}");
-                classes = classes.Where(x => !classesProcessed.Contains(x.Uri)).ToList(); total = classes.Count();
+                classes = classes.Where(x => !classesProcessed.Contains(x.Uri)).ToList();
+                total = classes.Count();
                 log.LogInformation($"new # of classes: {total}");
             }
             log.LogInformation("Looping on classes...");
@@ -156,12 +160,19 @@ namespace LOD_CM_CLI
                 Directory.CreateDirectory(instancePath);
                 var fpFilePath = Path.Combine(instancePath, "fp.json");
                 var notransactionsFilePath = Path.Combine(instancePath, "NO_TRANSACTIONS.txt"); // used to avoid computing again transactions when there is none to compute!
-                if (File.Exists(fpFilePath)) 
+                if (File.Exists(fpFilePath))
                 {
                     // fp has already been computed
                     var jsonContent = File.ReadAllText(fpFilePath);
                     fp = JsonConvert.DeserializeObject<FrequentPattern<int>>(jsonContent);
                     fp.SetServiceProvider(serviceProvider);
+                    for (int i = 0; i < fp.fis.Count; i++)
+                    {
+                        for (int j = 0; j < fp.fis[i].TransactionIDList.Count; j++)
+                        {
+                            fp.fis[i].Add(fp.fis[i].TransactionIDList[j]);
+                        }
+                    }
                 }
                 else if (File.Exists(notransactionsFilePath))
                 {
@@ -183,21 +194,28 @@ namespace LOD_CM_CLI
                     transactions.SaveToFiles(
                         Path.Combine(instancePath, "transactions.txt"),
                         Path.Combine(instancePath, "dictionary.txt")
-                    ).Wait();                
+                    ).Wait();
 
                     fp = new FrequentPattern<int>(serviceProvider);
                     fp.GetFrequentPatternV2(transactions, 0.01);
                     fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
-                    
+
+                    for (int i = 0; i < fp.fis.Count; i++)
+                    {
+                        for (int j = 0; j < fp.fis[i].Count; j++)
+                        {
+                            fp.fis[i].TransactionIDList.Add(fp.fis[i][j]);
+                        }
+                    }
                     var jsonFP = JsonConvert.SerializeObject(fp);
                     File.WriteAllTextAsync(fpFilePath, jsonFP).Wait();
                 }
 
-                
+
                 //fp.ComputeMFP(); // we must compute MFP for each threshold
                 var thresholdRange = Enumerable.Range(1, 100);
 #if DEBUG
-                thresholdRange = new[] { 82 };
+                thresholdRange = new[] { 1 };
 #endif
                 foreach (var thresholdInt in thresholdRange)
                 {
@@ -212,8 +230,8 @@ namespace LOD_CM_CLI
                     fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt"), mfps).Wait();
                     // fp.SaveDictionary(Path.Combine(imageFilePath, "dict.txt")).Wait();
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
-                        instanceClass, threshold, fp, serviceProvider, 
-                        plantUmlJarPath, localGraphvizDotPath, mfps).Result;
+                        instanceClass, threshold, fp, serviceProvider,
+                        plantUmlJarPath, localGraphvizDotPath, mfps);
 
                     var counter = 0;
                     foreach (var ig in igs)
@@ -235,7 +253,7 @@ namespace LOD_CM_CLI
                         // {
                         //     failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
                         // }
-                      }
+                    }
                 }
                 classesProcessed.Add(instanceClass.Uri);
             }
@@ -268,7 +286,7 @@ namespace LOD_CM_CLI
             // ), finalErrors);
         }
 
-        
+
         private static void Configuration(string configurationFilePath)
         {
             if (!File.Exists(configurationFilePath))

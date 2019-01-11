@@ -204,7 +204,7 @@ namespace LOD_CM_CLI.Uml
 
 
 
-        public static async Task<List<ImageGenerator>> GenerateTxtForUml(Dataset ds,
+        public static List<ImageGenerator> GenerateTxtForUml(Dataset ds,
             InstanceLabel instanceClass, double threshold,
             FrequentPattern<int> fp, ServiceProvider serviceProvider, string plantUmlJarPath, string localGraphvizDotPath,
             IEnumerable<PatternDiscovery.ItemSet<int>> mfps)
@@ -228,7 +228,7 @@ namespace LOD_CM_CLI.Uml
                 cModel.AppendLine("skinparam linetype ortho");
                 var duplicate = new HashSet<string>();
 
-                var propertySupport = Convert.ToInt32(mfp.Support * 100);
+                // var propertySupport = Convert.ToInt32(mfp.Support * 100);
                 var usedProp = new HashSet<int>();
                 result.usedPropInstanceLabel = new HashSet<InstanceLabel>();
                 result.usedClassInstanceLabel = new HashSet<InstanceLabel>();
@@ -260,6 +260,7 @@ namespace LOD_CM_CLI.Uml
                         result.usedClassInstanceLabel.Add(rIL);
                         var r = rIL.Label;
                         string strToAdd;
+                        var propertySupport = fp.fis.Where(x => x.Count == 1 && x.Contains(id)).Select(x => Convert.ToInt32(x.Support * 100d).ToString()).FirstOrDefault();
                         if (dash)
                             strToAdd = d + " .. " + r + " : " + p + " sup:" + propertySupport;
                         else
@@ -289,6 +290,7 @@ namespace LOD_CM_CLI.Uml
                         var p = pIL.Label;
                         var datatype = fp.transactions.dataset.dataTypeProperties.GetValueOrDefault(property);
                         var r = datatype.GetUriFragment();
+                        var propertySupport = fp.fis.Where(x => x.Count == 1 && x.Contains(id)).Select(x => Convert.ToInt32(x.Support * 100d).ToString()).FirstOrDefault();
                         var strToAdd = p + ":" + r + " sup=" + propertySupport;
                         if (!duplicate.Contains(strToAdd))
                         {
@@ -307,6 +309,7 @@ namespace LOD_CM_CLI.Uml
                         new InstanceLabel(property, null, null);
                     result.usedPropInstanceLabel.Add(pIL);
                     var p = pIL.Label;
+                    var propertySupport = fp.fis.Where(x => x.Count == 1 && x.Contains(id)).Select(x => Convert.ToInt32(x.Support * 100d).ToString()).FirstOrDefault();
                     var strToAdd = p + " sup=" + propertySupport;
                     if (!duplicate.Contains(strToAdd))
                     {
@@ -327,34 +330,107 @@ namespace LOD_CM_CLI.Uml
                 // loop for related classes hierarchy
                 foreach (var classUri in classes)
                 {
-                    var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
-                        fp.transactions.dataset.classes[classUri] :
-                        new InstanceLabel(classUri, null, null);
-                    result.usedClassInstanceLabel.Add(cIL);
-                    var c = cIL.Label;
-                    if (fp.transactions.dataset.classesDepths.ContainsKey(classUri))
-                    {
-                        foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
-                        {
-                            var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ?
-                                fp.transactions.dataset.classes[superClass] :
-                                new InstanceLabel(superClass, null, null);
-                            result.usedClassInstanceLabel.Add(scIL);
-                            var sc = scIL.Label;
-                            var strToAdd = sc + " <|-- " + c;
-                            if (!duplicate.Contains(strToAdd))
-                            {
-                                cModel.AppendLine(strToAdd);
-                                duplicate.Add(strToAdd);
-                            }
-                        }
-                    }
+                    BuildClassesHierarchy(classUri, result, cModel, duplicate, classes, fp);
+                    // var set = fp.transactions.dataset.classesDepths[classUri];
+
+                    // var closestSuperClass = set.OrderBy(x => x.Value).Select(x => x.Key).First();
+                    // var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
+                    //         fp.transactions.dataset.classes[classUri] :
+                    //         new InstanceLabel(classUri, null, null);
+                    // result.usedClassInstanceLabel.Add(cIL);
+                    // var c = cIL.Label;
+
+
+                    // if (fp.transactions.dataset.classesDepths.ContainsKey(classUri))
+                    // {
+                    //     foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
+                    //     {
+                    //         var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ?
+                    //     fp.transactions.dataset.classes[closestSuperClass] :
+                    //     new InstanceLabel(closestSuperClass, null, null);
+                    //         result.usedClassInstanceLabel.Add(scIL);
+                    //         var sc = scIL.Label;
+                    //         var strToAdd = sc + " <|-- " + c;
+                    //         if (!duplicate.Contains(strToAdd))
+                    //         {
+                    //             cModel.AppendLine(strToAdd);
+                    //             duplicate.Add(strToAdd);
+                    //         }
+                    //     }
+                    // }
+
+
+
+
+                    //var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
+                    //    fp.transactions.dataset.classes[classUri] :
+                    //    new InstanceLabel(classUri, null, null);
+                    //result.usedClassInstanceLabel.Add(cIL);
+                    //var c = cIL.Label;
+                    //if (fp.transactions.dataset.classesDepths.ContainsKey(classUri))
+                    //{
+                    //   foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
+                    //   {
+                    //       var scIL = fp.transactions.dataset.classes.ContainsKey(superClass) ?
+                    //           fp.transactions.dataset.classes[superClass] :
+                    //            new InstanceLabel(superClass, null, null);
+                    //       result.usedClassInstanceLabel.Add(scIL);
+                    //       var sc = scIL.Label;
+                    //       var strToAdd = sc + " <|-- " + c;
+                    //       if (!duplicate.Contains(strToAdd))
+                    //        {
+                    //            cModel.AppendLine(strToAdd);
+                    //            duplicate.Add(strToAdd);
+                    //        }
+                    //    }
+                    //}
 
                 }
                 cModel.AppendLine("@enduml");
                 result.contentForUml = cModel.ToString();
             }
             return finalResults;
+        }
+
+        /// Build the hierachy of classes for the given class uri into the CModel stringbuilder.
+        /// <summary>
+        /// Build the hierachy of classes for the given class uri into the CModel stringbuilder.
+        /// </summary>
+        /// <returns></returns>
+        private static void BuildClassesHierarchy(string classUri, ImageGenerator result, StringBuilder cModel, HashSet<string> duplicate, HashSet<string> classes, FrequentPattern<int> fp)
+        {
+            if ("http://www.w3.org/2002/07/owl#Thing".Equals(classUri)) return;
+            var set = fp.transactions.dataset.classesDepths[classUri];
+
+            var closestSuperClass = set.OrderBy(x => x.Value).Select(x => x.Key).First();
+            var cIL = fp.transactions.dataset.classes.ContainsKey(classUri) ?
+                    fp.transactions.dataset.classes[classUri] :
+                    new InstanceLabel(classUri, null, null);
+            result.usedClassInstanceLabel.Add(cIL);
+            var c = cIL.Label;
+
+
+            if (fp.transactions.dataset.classesDepths.ContainsKey(classUri))
+            {
+                foreach (var superClass in fp.transactions.dataset.classesDepths[classUri].Keys)
+                {
+                    var scIL = fp.transactions.dataset.classes.ContainsKey(closestSuperClass) ?
+                fp.transactions.dataset.classes[closestSuperClass] :
+                new InstanceLabel(closestSuperClass, null, null);
+                    result.usedClassInstanceLabel.Add(scIL);
+                    var sc = scIL.Label;
+                    var strToAdd = sc + " <|-- " + c;
+                    if (!duplicate.Contains(strToAdd))
+                    {
+                        cModel.AppendLine(strToAdd);
+                        duplicate.Add(strToAdd);
+                    }
+                    if (!classes.Contains(scIL.Uri))
+                    {
+                        BuildClassesHierarchy(scIL.Uri, result, cModel, duplicate, classes, fp);
+                    }
+                }
+            }
         }
 
     }
