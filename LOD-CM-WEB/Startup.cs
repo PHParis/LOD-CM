@@ -9,11 +9,13 @@ using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace LOD_CM
 {
     public class Startup
     {
+        private static ILogger log;
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -32,8 +34,9 @@ namespace LOD_CM
             });
             
             services.AddMvc()
-                .AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/lod-cm/ConceptualModel", "ConceptualModel");})
+                //.AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/lod-cm/ConceptualModel", "ConceptualModel");})
                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+        
 // #if DEBUG
 //             services.AddMvc()
 //                 .AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/lod-cm/Index", "Index").AddPageRoute("/lod-cm/ConceptualModel", "ConceptualModel");})
