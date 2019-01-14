@@ -30,9 +30,18 @@ namespace LOD_CM
                 options.CheckConsentNeeded = context => true;
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
-
-
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            
+            services.AddMvc()
+                .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+// #if DEBUG
+//             services.AddMvc()
+//                 .AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/lod-cm/Index", "Index").AddPageRoute("/lod-cm/ConceptualModel", "ConceptualModel");})
+//                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+// #else
+//             services.AddMvc()
+//                 .AddRazorPagesOptions(options => {options.RootDirectory = "/lod-cm";})
+//                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+// #endif
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
