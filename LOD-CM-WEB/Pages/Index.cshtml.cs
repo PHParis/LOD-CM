@@ -75,7 +75,7 @@ namespace LOD_CM.Pages
             {
                 return RedirectToPage("/Index");
             }
-            return RedirectToPage("/lod-cm/ConceptualModel", Dataset);
+            return RedirectToPage("/ConceptualModel", Dataset);
         }
     }
 
