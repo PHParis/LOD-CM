@@ -31,7 +31,6 @@ namespace LOD_CM_CLI
         private static ILogger log;
         static async Task Main(string[] args)
         {
-            // TODO: replace SPARQL code everywhere by DotnetRDF API     
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI.csproj
             // dotnet publish -r linux-x64 --self-contained -o out -c Release LOD-CM-CLI/LOD-CM-CLI.csproj
             Configuration(args[0]);
@@ -143,6 +142,7 @@ namespace LOD_CM_CLI
             }
             log.LogInformation("Looping on classes...");
             var count = 0;
+            var objLock = new Object();
             // this will be used after the parallel loop to re-download 
             // images when a problems occurred
             // var failedContentForUmlPath = new ConcurrentBag<string>();
@@ -256,11 +256,14 @@ namespace LOD_CM_CLI
                     }
                 }
                 classesProcessed.Add(instanceClass.Uri);
+                lock (objLock)
+                {                    
+                    log.LogInformation("saving processed classes...");
+                    File.WriteAllLinesAsync(classesProcessedPath, classesProcessed).Wait();
+                }
             }
             );
             log.LogInformation("main loop ended!");
-            log.LogInformation("saving processed classes...");
-            await File.WriteAllLinesAsync(classesProcessedPath, classesProcessed);
             // // after the loop we search for images not generated to generate them
             // log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
             // var finalErrors = new List<string>();
