@@ -93,7 +93,7 @@ $(document).ready(function () {
             selector: '.umlClass',
             callback: function (key, options) {
                 if (key == 'zoom-in') {
-                    window.location.href = '/ConceptualModel?Label=' +
+                    window.location.href = '/lod-cm/ConceptualModel?Label=' +
                         $('#DatasetLabel').attr('value') + '&Class=' +
                         $(this).attr('id') +
                         '&Threshold=' + $('#Threshold').attr('value');
