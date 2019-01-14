@@ -73,9 +73,9 @@ namespace LOD_CM.Pages
         {
             if (!ModelState.IsValid)
             {
-                return RedirectToPage("/lod-cm/Index");
+                return RedirectToPage("/Index");
             }
-            return RedirectToPage("/lod-cm/ConceptualModel", Dataset);
+            return RedirectToPage("/ConceptualModel", Dataset);
         }
     }
 
