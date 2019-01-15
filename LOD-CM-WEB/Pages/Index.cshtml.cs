@@ -5,20 +5,27 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using LOD_CM_CLI.Data;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Newtonsoft.Json;
 
 namespace LOD_CM.Pages
 {
-    
+
     public class IndexModel : PageModel
     {
-        
-        public async Task OnGetAsync()
-        {     
-            
+        private IHttpContextAccessor _accessor;
 
+        public IndexModel(IHttpContextAccessor httpContextAccessor)
+        {
+            _accessor = httpContextAccessor;
+        }
+
+        public async Task OnGetAsync()
+        {
+            var clientIPAddress = _accessor.HttpContext.Connection.RemoteIpAddress.ToString();
+            await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
             ThresholdRanges = Enumerable.Range(1, 100).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
                 Path.Combine(Program.mainDir, "datasets.txt")
@@ -31,7 +38,7 @@ namespace LOD_CM.Pages
                 {
                     var filePath = Path.Combine(dsDir, "dataset.json");
                     if (System.IO.File.Exists(filePath))
-                    {                        
+                    {
                         var dsInfoContent = await System.IO.File.ReadAllTextAsync(filePath);
                         var dsInfo = JsonConvert.DeserializeObject<Dataset>(dsInfoContent);
                         ClassesNames.Add(dsInfo.classes
@@ -41,13 +48,13 @@ namespace LOD_CM.Pages
                     }
                 }
             }
-            #if DEBUG
+#if DEBUG
             ClassesNames.Add(new[]
             {
                 "WikiTest1",
                 "WikiTest2"
             });
-            #endif
+#endif
             // ClassesNames = new[]
             //         {
             //             new[]
