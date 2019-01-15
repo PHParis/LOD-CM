@@ -34,7 +34,7 @@ namespace LOD_CM
             });
             
             services.AddMvc()
-                //.AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/lod-cm/ConceptualModel", "ConceptualModel");})
+                .AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/ConceptualModel", "/lod-cm/ConceptualModel");})
                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
         
 // #if DEBUG

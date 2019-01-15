@@ -37,7 +37,7 @@ ENTRYPOINT ["dotnet", "LOD-CM.dll", "/data"]
 # Pour construire l'image:
 # docker build -t lod_cm .
 # Pour lancer le container (ps: je te laisse voir pour les ports avec les ingé):
-# docker run  --rm -v /data2/hamdif/doctorants/ph/xp/lod_cm:/data -d -p 8080:80 --name lod_cm_web lod_cm
+# docker run  --rm -v /data2/hamdif/doctorants/ph/xp/lod_cm:/data -d -p 84:80 --name lod_cm_web lod_cm
 # docker run  --rm -v E:/download:/data -d -p 8080:80 --name lod_cm_web lod_cm
 # Pour stopper et supprimer le container
 # docker stop lod_cm_web
