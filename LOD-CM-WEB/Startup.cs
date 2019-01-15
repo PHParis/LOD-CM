@@ -36,6 +36,8 @@ namespace LOD_CM
             services.AddMvc()
                 .AddRazorPagesOptions(options => {options.Conventions.AddPageRoute("/ConceptualModel", "/lod-cm/ConceptualModel");}) // Not working .AddPageRoute("/Index", "/lod-cm/")
                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+                
+            services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         
 // #if DEBUG
 //             services.AddMvc()

@@ -15,17 +15,17 @@ namespace LOD_CM.Pages
 
     public class IndexModel : PageModel
     {
-        // private IHttpContextAccessor _accessor;
+        private IHttpContextAccessor _accessor;
 
-        // public IndexModel(IHttpContextAccessor httpContextAccessor)
-        // {
-        //     _accessor = httpContextAccessor;
-        // }
+        public IndexModel(IHttpContextAccessor httpContextAccessor)
+        {
+            _accessor = httpContextAccessor;
+        }
 
         public async Task OnGetAsync()
         {
-            // var clientIPAddress = _accessor.HttpContext.Connection.RemoteIpAddress.ToString();
-            // await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
+            var clientIPAddress = _accessor.HttpContext.Connection.RemoteIpAddress.ToString();
+            await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
             ThresholdRanges = Enumerable.Range(1, 100).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
                 Path.Combine(Program.mainDir, "datasets.txt")
