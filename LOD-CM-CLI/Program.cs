@@ -260,6 +260,7 @@ namespace LOD_CM_CLI
                 {                    
                     log.LogInformation("saving processed classes...");
                     File.WriteAllLinesAsync(classesProcessedPath, classesProcessed).Wait();
+                    log.LogInformation("processed classes saved");
                 }
             }
             );
