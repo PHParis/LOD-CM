@@ -210,9 +210,7 @@ namespace LOD_CM_CLI
                     var jsonFP = JsonConvert.SerializeObject(fp);
                     File.WriteAllTextAsync(fpFilePath, jsonFP).Wait();
                 }
-
-
-                //fp.ComputeMFP(); // we must compute MFP for each threshold
+                
                 var thresholdRange = Enumerable.Range(1, 100);
 #if DEBUG
                 thresholdRange = new[] { 1 };
@@ -228,7 +226,7 @@ namespace LOD_CM_CLI
                     Directory.CreateDirectory(imageFilePath);
                     var mfps = fp.ComputeMFP(threshold).ToList();
                     fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt"), mfps).Wait();
-                    // fp.SaveDictionary(Path.Combine(imageFilePath, "dict.txt")).Wait();
+                    
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
                         instanceClass, threshold, fp, serviceProvider,
                         plantUmlJarPath, localGraphvizDotPath, mfps);
@@ -244,15 +242,6 @@ namespace LOD_CM_CLI
                             Path.Combine(imageFilePath, $"usedClasses_{counter}.json"),
                             Path.Combine(imageFilePath, $"usedProperties_{counter}.json")).Wait();
                         ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
-                        // var isDownloadOK = ig.GetImageContent().Result;
-                        // if (isDownloadOK)
-                        // {
-                        //     ig.SaveImage(Path.Combine(imageFilePath, $"img_{counter}.svg")).Wait();
-                        // }
-                        // else
-                        // {
-                        //     failedContentForUmlPath.Add(Path.Combine(imageFilePath, $"plant_{counter}.txt"));
-                        // }
                     }
                 }
                 classesProcessed.Add(instanceClass.Uri);
@@ -265,29 +254,6 @@ namespace LOD_CM_CLI
             }
             );
             log.LogInformation("main loop ended!");
-            // // after the loop we search for images not generated to generate them
-            // log.LogInformation($"Re-downloading {failedContentForUmlPath.Count} failed images...");
-            // var finalErrors = new List<string>();
-            // foreach (var contentPath in failedContentForUmlPath)
-            // {
-            //     try
-            //     {
-            //         var contentForUml = await File.ReadAllTextAsync(contentPath);
-            //         var svgFileContent = await ImageGenerator.GetImageContent(contentForUml, plantUmlJarPath, localGraphvizDotPath);
-            //         var filePath = contentPath.Replace("plant_", "img_").Replace(".txt", ".svg");
-            //         await File.WriteAllTextAsync(filePath, svgFileContent);
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         finalErrors.Add(contentPath);
-            //         log.LogError($"{ex}");
-            //     }
-            // }
-            // await File.WriteAllLinesAsync(Path.Combine(
-            //     mainDirectory,
-            //     dataset.Label,
-            //     "imagesInError.txt"
-            // ), finalErrors);
         }
 
 
