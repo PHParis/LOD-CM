@@ -118,7 +118,7 @@ namespace LOD_CM_CLI
             //     await File.WriteAllTextAsync(jsonClassListPath, json);
             // }
 #if DEBUG
-            classes = classes.Where(x => x.Label == "AmericanFootballTeam").ToList();
+            classes = classes.Where(x => x.Label == "MilitaryPerson").ToList();
             // classes = classes.Take(1).ToList();
 #endif
             var total = classes.Count();
@@ -142,13 +142,15 @@ namespace LOD_CM_CLI
             }
             log.LogInformation("Looping on classes...");
             var count = 0;
-            var objLock = new Object();
+            // var objLock = new Object();
             // this will be used after the parallel loop to re-download 
             // images when a problems occurred
             // var failedContentForUmlPath = new ConcurrentBag<string>();
-            Parallel.ForEach(classes, instanceClass =>
+            // Parallel.ForEach(classes, instanceClass =>
+            foreach (var instanceClass in classes)
             {
-                Interlocked.Increment(ref count);
+                // Interlocked.Increment(ref count);
+                count++;
                 log.LogInformation($"class: {instanceClass.Label} ({count}/{total})");
 
                 FrequentPattern<int> fp;
@@ -177,17 +179,18 @@ namespace LOD_CM_CLI
                 else if (File.Exists(notransactionsFilePath))
                 {
                     log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
-                    return;
+                    continue;//return;
                 }
                 else
                 {
+                    log.LogDebug($"computation of transactions...");
                     var transactions = TransactionList<int>.GetTransactions(dataset, instanceClass).Result;
                     log.LogDebug($"transactions computed: {transactions.transactions.Count}");
                     if (!transactions.transactions.Any())
                     {
                         log.LogTrace($"There is no transactions for class {instanceClass.Label}, there is no need to continue.");
                         File.WriteAllTextAsync(notransactionsFilePath, "").Wait();
-                        return;
+                        continue;//return;
                     }
                     // ex: ${workingdirectory}/DBpedia/Film
 
@@ -196,6 +199,7 @@ namespace LOD_CM_CLI
                         Path.Combine(instancePath, "dictionary.txt")
                     ).Wait();
 
+                    log.LogDebug($"computation of fp...");
                     fp = new FrequentPattern<int>(serviceProvider);
                     fp.GetFrequentPatternV2(transactions, 0.01);
                     fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
@@ -209,13 +213,20 @@ namespace LOD_CM_CLI
                     }
                     var jsonFP = JsonConvert.SerializeObject(fp);
                     File.WriteAllTextAsync(fpFilePath, jsonFP).Wait();
+                    log.LogDebug($"fp computed");
                 }
-                
-                var thresholdRange = Enumerable.Range(1, 100);
+
+                var thresholdRange = Enumerable.Range(50, 100).OrderByDescending(x => x).AsEnumerable();
+                var maxDegreeOfParallelism = 50;
 #if DEBUG
                 thresholdRange = new[] { 1 };
+                maxDegreeOfParallelism = 1;
 #endif
+                // ThreadPool.SetMinThreads(maxDegreeOfParallelism, maxDegreeOfParallelism);
                 foreach (var thresholdInt in thresholdRange)
+                // Parallel.ForEach(thresholdRange, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism }, thresholdInt =>
+                // thresholdRange.AsParallel().ForAll(thresholdInt =>
+                // Parallel.ForEach(thresholdRange, thresholdInt =>
                 {
                     log.LogInformation($"class: {instanceClass.Label} // threshold: {thresholdInt})");
                     var threshold = thresholdInt / 100d;
@@ -224,9 +235,12 @@ namespace LOD_CM_CLI
                         instancePath,
                         thresholdInt.ToString());
                     Directory.CreateDirectory(imageFilePath);
+                    var sw = Stopwatch.StartNew();
                     var mfps = fp.ComputeMFP(threshold).ToList();
                     fp.SaveMFP(Path.Combine(imageFilePath, "mfp.txt"), mfps).Wait();
-                    
+                    sw.Stop();
+                    log.LogInformation($"{mfps.Count} mfps computed in ({thresholdInt}): {sw.Elapsed.ToPrettyFormat()}");
+                    sw.Restart();
                     var igs = ImageGenerator.GenerateTxtForUml(dataset,
                         instanceClass, threshold, fp, serviceProvider,
                         plantUmlJarPath, localGraphvizDotPath, mfps);
@@ -243,16 +257,18 @@ namespace LOD_CM_CLI
                             Path.Combine(imageFilePath, $"usedProperties_{counter}.json")).Wait();
                         ig.SaveContentForPlantUML(Path.Combine(imageFilePath, $"plant_{counter}.txt")).Wait();
                     }
+                    log.LogInformation($"images computed in ({thresholdInt}): {sw.Elapsed.ToPrettyFormat()}");
                 }
+                // );
                 classesProcessed.Add(instanceClass.Uri);
-                lock (objLock)
-                {                    
-                    log.LogInformation("saving processed classes...");
-                    File.WriteAllLinesAsync(classesProcessedPath, classesProcessed).Wait();
-                    log.LogInformation("processed classes saved");
-                }
+                // lock (objLock)
+                // {
+                log.LogInformation("saving processed classes...");
+                File.WriteAllLinesAsync(classesProcessedPath, classesProcessed).Wait();
+                log.LogInformation("processed classes saved");
+                // }
             }
-            );
+            // );
             log.LogInformation("main loop ended!");
         }
 

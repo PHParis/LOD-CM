@@ -34,6 +34,10 @@ namespace LOD_CM.Pages
         public int Selection { get; private set; }
         public async Task OnGetAsync(DatasetForIndex dataset)
         {
+            if (dataset.Threshold < 50)
+                dataset.Threshold = 50;
+            if (dataset.Threshold > 100)
+                dataset.Threshold = 100;
             ErrorMessage = string.Empty;
             Selection = 0;
             var mainDir = Program.mainDir;

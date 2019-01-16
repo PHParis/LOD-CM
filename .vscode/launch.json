@@ -101,13 +101,27 @@
             }
         },
         {
-            "name": ".NET Core Launch (console)",
+            "name": "console PH portable",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build-cli",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/LOD-CM-CLI/bin/Debug/netcoreapp2.2/LOD-CM-CLI.dll",
             "args": ["${workspaceFolder}\\LOD-CM-CLI\\nlog.config", "${workspaceFolder}\\LOD-CM-CLI\\portable.json"],
+            "cwd": "${workspaceFolder}/LOD-CM-CLI",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "console PH CNAM",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-cli",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/LOD-CM-CLI/bin/Debug/netcoreapp2.2/LOD-CM-CLI.dll",
+            "args": ["${workspaceFolder}\\LOD-CM-CLI\\nlog.config", "${workspaceFolder}\\LOD-CM-CLI\\cnam.ph.json"],
             "cwd": "${workspaceFolder}/LOD-CM-CLI",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
             "console": "internalConsole",

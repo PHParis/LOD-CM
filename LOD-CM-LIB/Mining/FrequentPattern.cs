@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -117,17 +118,55 @@ namespace LOD_CM_CLI.Mining
         /// <returns></returns>
         public IEnumerable<PatternDiscovery.ItemSet<T>> ComputeMFP(double threshold)
         {
+#if DEBUG
+            var sw = Stopwatch.StartNew();
+#endif
             var fisSet = fis.Where(x => x.Support >= threshold)
                 .Select(x => x.ToHashSet()).ToHashSet();
-            foreach (var itemSet in fis.Where(x => x.Support >= threshold))
+            var degreeOfParallelism = 70;
+#if DEBUG
+            degreeOfParallelism = 4;
+            sw.Stop();
+            log.LogInformation($"1 ({threshold}): {sw.Elapsed.ToPrettyFormat()}");
+            var e2 = new List<long>();
+            var e3 = new List<long>();
+            var e4 = new List<long>();
+            sw.Restart();
+#endif
+            // foreach (var itemSet in fis.Where(x => x.Support >= threshold))
+            var result = fis.AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(x => x.Support >= threshold).Where(itemSet =>
             {
+#if DEBUG
+                sw.Stop();
+                e2.Add(sw.ElapsedMilliseconds);
+                sw.Restart();
+#endif
                 var set = itemSet.ToHashSet();
-                if (IsMFP(set, fisSet))
-                {
-                    yield return itemSet;
-                }
+#if DEBUG
+                sw.Stop();
+                e3.Add(sw.ElapsedMilliseconds);
+                sw.Restart();
+#endif
+                var isMFP = IsMFP(set, fisSet);
+#if DEBUG
+                sw.Stop();
+                e4.Add(sw.ElapsedMilliseconds);
+                sw.Restart();
+#endif
+                return isMFP;
+                // if (isMFP)
+                // {
+                //     yield return itemSet;
+                // }
                 // itemSet.IsMaximal = IsMFP(set, fisSet);
             }
+            ).ToList();
+#if DEBUG
+            log.LogInformation($"2 ({threshold}): avg={TimeSpan.FromMilliseconds(e2.Average())} // min={TimeSpan.FromMilliseconds(e2.Min())} // max={TimeSpan.FromMilliseconds(e2.Max())} // ");
+            log.LogInformation($"3 ({threshold}): avg={TimeSpan.FromMilliseconds(e3.Average())} // min={TimeSpan.FromMilliseconds(e3.Min())} // max={TimeSpan.FromMilliseconds(e3.Max())} // ");
+            log.LogInformation($"4 ({threshold}): avg={TimeSpan.FromMilliseconds(e4.Average())} // min={TimeSpan.FromMilliseconds(e4.Min())} // max={TimeSpan.FromMilliseconds(e4.Max())} // ");
+#endif
+            return result;
         }
 
         /// <summary>
