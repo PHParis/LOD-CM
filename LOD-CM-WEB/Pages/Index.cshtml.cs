@@ -26,7 +26,7 @@ namespace LOD_CM.Pages
         {
             var clientIPAddress = _accessor.HttpContext.Connection.RemoteIpAddress.ToString();
             await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
-            ThresholdRanges = Enumerable.Range(50, 50).OrderByDescending(x => x).ToList();
+            ThresholdRanges = Enumerable.Range(50, 51).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
                 Path.Combine(Program.mainDir, "datasets.txt")
             );
