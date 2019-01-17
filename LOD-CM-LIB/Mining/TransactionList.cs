@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -57,15 +58,20 @@ namespace LOD_CM_CLI.Mining
                 await dataset.LoadHdt();
             var instances = await dataset.GetInstances(instanceClass);
             result.instanceClass = instanceClass;
-            result.predicateToIntDict = new Dictionary<string, T>();
-            result.intToPredicateDict = new Dictionary<T, string>();
-            result.transactions = new List<Transaction<T>>();
+            var predicateToIntDict = new ConcurrentDictionary<string, T>();
+            var intToPredicateDict = new ConcurrentDictionary<T, string>();
+            var bag = new ConcurrentBag<Transaction<T>>();
             result.dataset = dataset;
             int instanceNumber = 0;
-            foreach (var instance in instances)
+            // foreach (var instance in instances)
+            var degreeOfParallelism = 70;
+            #if DEBUG
+            degreeOfParallelism = 4;
+            #endif
+            instances.AsParallel().WithDegreeOfParallelism(degreeOfParallelism).ForAll(instance =>
             {
                 instanceNumber++;
-                var predicates = await dataset.GetPredicates(instance);
+                var predicates = dataset.GetPredicates(instance).Result;
                 // transaction of the given instance
                 var currentTransaction = new HashSet<T>();
                 var hasType = false;
@@ -73,9 +79,9 @@ namespace LOD_CM_CLI.Mining
                 {
 
                     T predicateId;
-                    if (result.predicateToIntDict.ContainsKey(predicate))
+                    if (predicateToIntDict.ContainsKey(predicate))
                     {
-                        predicateId = result.predicateToIntDict[predicate];
+                        predicateId = predicateToIntDict[predicate];
                         if (predicate.Contains("type"))
                             hasType = true;
 
@@ -83,9 +89,9 @@ namespace LOD_CM_CLI.Mining
                     else
                     {
                         // FIXME: following line works only if T is of a number type... Thus, it's not real generic class...
-                        predicateId = (T)Convert.ChangeType(result.predicateToIntDict.Count + 1, typeof(T));
-                        result.predicateToIntDict[predicate] = predicateId;
-                        result.intToPredicateDict[predicateId] = predicate;
+                        predicateId = (T)Convert.ChangeType(predicateToIntDict.Count + 1, typeof(T));
+                        var addition1 = predicateToIntDict.TryAdd(predicate, predicateId);//[predicate] = predicateId;
+                        var addition2 = intToPredicateDict.TryAdd(predicateId, predicate);// [predicateId] = predicate;
                         if (predicate.Contains("type"))
                             hasType = true;
                     }
@@ -99,8 +105,12 @@ namespace LOD_CM_CLI.Mining
 
 
 
-                result.transactions.Add(new Transaction<T>(currentTransaction.ToArray()));
+                bag.Add(new Transaction<T>(currentTransaction.ToArray()));
             }
+            );
+            result.predicateToIntDict = predicateToIntDict.ToDictionary(x => x.Key, x => x.Value);
+            result.intToPredicateDict = intToPredicateDict.ToDictionary(x => x.Key, x => x.Value);
+            result.transactions = bag.ToList();
             result.domain = result.intToPredicateDict.Select(x => x.Key).ToList();
             return result;
         }
