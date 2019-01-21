@@ -197,6 +197,10 @@ namespace LOD_CM_CLI.Data
         public Dictionary<string, Dictionary<string, int>> classesDepths { get; set; }
         public void Precomputation()
         {
+            var maxDegreeOfParallelism = 70;
+#if DEBUG
+            maxDegreeOfParallelism = 4;
+#endif
             log.LogInformation($"Computing class depth");
             classesDepths = GetClassesDepth();
             log.LogInformation($"class depth done: {classesDepths.Count}");
@@ -208,7 +212,7 @@ namespace LOD_CM_CLI.Data
                 x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
                 .Select(x => x.Subject.ToString()).Distinct().ToArray();
             log.LogInformation($"# of rough classes: {classesTmp.Length}");
-            classes = classesTmp.AsParallel()
+            classes = classesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# classes: {classes.Count}");
@@ -223,14 +227,15 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
             // TODO: add logger everywhere 
-            var propertiesTmp = ontology.Triples.Where(x =>
+            var propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                .Where(x =>
                 x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
                 && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
                 x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
                 .Select(x => x.Subject.ToString()).Distinct().ToArray();
             log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
-            properties = propertiesTmp.AsParallel()
+            properties = propertiesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
                 .ToDictionary(x => x.Uri, x => x);
             log.LogInformation($"# properties: {properties.Count}");
@@ -384,7 +389,11 @@ namespace LOD_CM_CLI.Data
             var objectPropertiesConcurrent = new ConcurrentDictionary<string, (string domain, string range, bool dash)>();
             var dataTypePropertiesConcurrent = new ConcurrentDictionary<string, string>();
             var count = 0;
-            Parallel.ForEach(properties, propertyUri =>
+            var maxDegreeOfParallelism = 70;
+#if DEBUG
+            maxDegreeOfParallelism = 4;
+#endif
+            Parallel.ForEach(properties, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism }, propertyUri =>
             // Parallel.For(0, properties.Count, i =>
             {
                 // var propertyUri = properties[i];

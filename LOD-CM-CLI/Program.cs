@@ -206,9 +206,11 @@ namespace LOD_CM_CLI
             maxDegreeOfParallelism = 1;
 #endif
             log.LogInformation("FPs computation...");
+            count = 0;
             //foreach (var trans in listOfTrans){
-            var fps = listOfTrans.AsParallel().WithDegreeOfParallelism(maxDegreeOfParallelism).Select(tuple =>
+            var fps = listOfTrans.OrderBy(x => x.Item1.transactions.Count).AsParallel().AsOrdered().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism).Select(tuple =>
             {
+                Interlocked.Increment(ref count);
                 var transactions = tuple.Item1;
                 var instanceClass = tuple.Item2;
                 var instancePath = Path.Combine(
@@ -221,6 +223,7 @@ namespace LOD_CM_CLI
                 var fp = new FrequentPattern<int>(serviceProvider);
                 if (File.Exists(fpFilePath))
                 {
+                    log.LogDebug($"FP already computed... {instanceClass.Label}: {count}/{listOfTrans.Count}");
                     // fp has already been computed
                     var jsonContent = File.ReadAllText(fpFilePath);
                     fp = JsonConvert.DeserializeObject<FrequentPattern<int>>(jsonContent);
@@ -236,7 +239,7 @@ namespace LOD_CM_CLI
                 }
                 else
                 {
-                    log.LogDebug($"computation of fp...");
+                    log.LogDebug($"computation of fp... {instanceClass.Label}: {count}/{listOfTrans.Count}");
                     fp.GetFrequentPatternV2(transactions, 0.01);
                     fp.SaveFP(Path.Combine(instancePath, "fp.txt")).Wait();
 
@@ -251,12 +254,12 @@ namespace LOD_CM_CLI
                     var jsonFP = JsonConvert.SerializeObject(fp);
                     File.WriteAllTextAsync(fpFilePath, jsonFP).Wait();
                     fp.transactions = transactions;
-                    log.LogDebug($"fp computed");
+                    log.LogDebug($"fp computed {instanceClass.Label}: {count}/{listOfTrans.Count}");
                 }
                 return (fp, instanceClass);
-            }).ToList();
+            }).Where(x => !string.IsNullOrWhiteSpace(x.instanceClass.Uri)).ToList();
             //}
-            var thresholdRange = Enumerable.Range(50, 100).OrderByDescending(x => x).AsEnumerable();
+            var thresholdRange = Enumerable.Range(50, 51).OrderByDescending(x => x).AsEnumerable();
             // var maxDegreeOfParallelism = 50;
 #if DEBUG
             thresholdRange = new[] { 95 };
