@@ -210,29 +210,45 @@ namespace LOD_CM_CLI.Data
         /// </summary>
         /// <value></value>
         public Dictionary<string, Dictionary<string, int>> classesDepths { get; set; }
-        public void Precomputation(bool getPropertiesFromOntology, string[] classesToCompute)
+        public async Task Precomputation(bool getPropertiesFromOntology, string[] classesToCompute, string mainDir)
         {
             var maxDegreeOfParallelism = 70;
 #if DEBUG
             maxDegreeOfParallelism = 4;
 #endif
             log.LogInformation($"Computing class depth");
-            classesDepths = GetClassesDepth();
+            if (File.Exists(Path.Combine(mainDir, "classesDepths.json")))
+                classesDepths = await SerializationUtils<Dictionary<string, Dictionary<string, int>>>
+                    .Deserialize(Path.Combine(mainDir, "classesDepths.json"));
+            else
+            {
+                classesDepths = GetClassesDepth();
+                await SerializationUtils<Dictionary<string, Dictionary<string, int>>>
+                    .Serialize(classesDepths, Path.Combine(mainDir, "classesDepths.json"));
+            }
             log.LogInformation($"class depth done: {classesDepths.Count}");
             log.LogInformation($"classes...");
-            // superClassesOfClass = new Dictionary<string, HashSet<string>>();  
-            string[] classesTmp;          
-            if (classesToCompute == null || !classesToCompute.Any())
-                classesTmp = ontology.Triples.Where(x =>
-                    x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                    && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
-                    x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
-                    .Select(x => x.Subject.ToString()).Distinct().ToArray();
-            else classesTmp = classesToCompute;
-            log.LogInformation($"# of rough classes: {classesTmp.Length}");
-            classes = classesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
-                .ToDictionary(x => x.Uri, x => x);
+            // superClassesOfClass = new Dictionary<string, HashSet<string>>();
+            if (File.Exists(Path.Combine(mainDir, "classesTmp.json")))
+                classes = await SerializationUtils<Dictionary<string, InstanceLabel>>
+                    .Deserialize(Path.Combine(mainDir, "classesTmp.json"));
+            else
+            {
+                string[] classesTmp;
+                if (classesToCompute == null || !classesToCompute.Any())
+                    classesTmp = ontology.Triples.Where(x =>
+                        x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                        && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
+                        x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
+                        .Select(x => x.Subject.ToString()).Distinct().ToArray();
+                else classesTmp = classesToCompute;
+                log.LogInformation($"# of rough classes: {classesTmp.Length}");
+                classes = classesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                    .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
+                    .ToDictionary(x => x.Uri, x => x);
+                await SerializationUtils<Dictionary<string, InstanceLabel>>
+                    .Serialize(classes, Path.Combine(mainDir, "classesTmp.json"));
+            }
             log.LogInformation($"# classes: {classes.Count}");
             // var superClassesOfClassConcurrent = new ConcurrentDictionary<string, HashSet<string>>();
             // // foreach (var @class in classes)
@@ -244,30 +260,52 @@ namespace LOD_CM_CLI.Data
             // superClassesOfClass = superClassesOfClassConcurrent.ToDictionary(x => x.Key, x => x.Value);
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
-            // TODO: add logger everywhere 
-            string[] propertiesTmp;
-            log.LogInformation($"getPropertiesFromOntology: {getPropertiesFromOntology}");
-            if (getPropertiesFromOntology)
-            {                
-                propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                    .Where(x =>
-                    x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                    && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
-                    x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
-                    x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
-                    .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            // TODO: add logger everywhere             
+            if (File.Exists(Path.Combine(mainDir, "propertiesTmp.json")))
+                properties = await SerializationUtils<Dictionary<string, InstanceLabel>>
+                    .Deserialize(Path.Combine(mainDir, "propertiesTmp.json"));
+            else
+            {
+                string[] propertiesTmp;
+                log.LogInformation($"getPropertiesFromOntology: {getPropertiesFromOntology}");
+                if (getPropertiesFromOntology)
+                {
+                    propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                        .Where(x =>
+                        x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                        && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
+                        x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
+                        x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
+                        .Select(x => x.Subject.ToString()).Distinct().ToArray();
+                }
+                else
+                {
+                    propertiesTmp = hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                        .WithDegreeOfParallelism(maxDegreeOfParallelism).Select(x => x.getPredicate()).Distinct().ToArray();
+                }
+                log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
+                properties = propertiesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                    .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
+                    .ToDictionary(x => x.Uri, x => x);
+                await SerializationUtils<Dictionary<string, InstanceLabel>>
+                    .Serialize(properties, Path.Combine(mainDir, "propertiesTmp.json"));
+            }
+            log.LogInformation($"# properties: {properties.Count}");
+            if (File.Exists(Path.Combine(mainDir, "objectPropertiesTmp.json")))
+            {
+                objectProperties = await SerializationUtils<Dictionary<string, (string, string, bool)>>
+                    .Deserialize(Path.Combine(mainDir, "objectPropertiesTmp.json"));
+                dataTypeProperties = await SerializationUtils<Dictionary<string, string>>
+                    .Deserialize(Path.Combine(mainDir, "dataTypePropertiesTmp.json"));
             }
             else
             {
-                propertiesTmp =  hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .WithDegreeOfParallelism(maxDegreeOfParallelism).Select(x => x.getPredicate()).Distinct().ToArray();
+                GetPropertyDomainRangeOrDataType(properties.Values.Select(x => x.Uri).ToList());
+                await SerializationUtils<Dictionary<string, (string, string, bool)>>
+                    .Serialize(objectProperties, Path.Combine(mainDir, "objectPropertiesTmp.json"));
+                await SerializationUtils<Dictionary<string, string>>
+                    .Serialize(dataTypeProperties, Path.Combine(mainDir, "dataTypePropertiesTmp.json"));
             }
-            log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
-            properties = propertiesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
-                .ToDictionary(x => x.Uri, x => x);
-            log.LogInformation($"# properties: {properties.Count}");
-            GetPropertyDomainRangeOrDataType(properties.Values.Select(x => x.Uri).ToList());
             log.LogInformation($"properties done");
 
         }
