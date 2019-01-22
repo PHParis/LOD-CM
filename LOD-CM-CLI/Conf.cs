@@ -23,19 +23,5 @@ namespace LOD_CM_CLI
         /// <value></value>
         public bool precomputationOnly { get; set; }
         public string plantUmlJarPath { get; set; }
-
-        
-        /// <summary>
-        /// If true, get properties from ontology.false If false, get them from dataset.
-        /// </summary>
-        /// <value></value>
-        public bool getPropertiesFromOntology { get; set; } = true;
-        
-        
-        /// <summary>
-        /// hard encoding of used classes. If provided, the program doesn't try to compute classes that are in the dataset
-        /// </summary>
-        /// <value></value>
-        public string[] classesToCompute { get; set; }
     }
 }

@@ -48,6 +48,20 @@ namespace LOD_CM_CLI.Data
         /// <value></value>
         public string OntologyNameSpace { get; set; }
 
+        
+        /// <summary>
+        /// If true, get properties from ontology.false If false, get them from dataset.
+        /// </summary>
+        /// <value></value>
+        public bool getPropertiesFromOntology { get; set; } = true;
+
+
+        /// <summary>
+        /// hard encoding of used classes. If provided, the program doesn't try to compute classes that are in the dataset
+        /// </summary>
+        /// <value></value>
+        public string[] classesToCompute { get; set; }
+
         private HDT hdt;
         public string hdtFilePath { get; set; }
         public string ontologyFilePath { get; set; }
@@ -210,7 +224,7 @@ namespace LOD_CM_CLI.Data
         /// </summary>
         /// <value></value>
         public Dictionary<string, Dictionary<string, int>> classesDepths { get; set; }
-        public async Task Precomputation(bool getPropertiesFromOntology, string[] classesToCompute, string mainDir)
+        public async Task Precomputation(string mainDir)
         {
             var maxDegreeOfParallelism = 70;
 #if DEBUG
