@@ -41,8 +41,9 @@ namespace LOD_CM.Pages
                     {
                         var dsInfoContent = await System.IO.File.ReadAllTextAsync(filePath);
                         var dsInfo = JsonConvert.DeserializeObject<Dataset>(dsInfoContent);
+                        var classToRemove = await System.IO.File.ReadAllLinesAsync(Path.Combine(Program.mainDir, "classes_to_delete.txt"));
                         ClassesNames.Add(dsInfo.classes
-                            .Select(x => x.Value.Label)
+                            .Select(x => x.Value.Label).Except(classToRemove)
                             .OrderBy(x => x)
                             .ToList());
                     }
