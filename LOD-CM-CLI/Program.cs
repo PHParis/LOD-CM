@@ -47,7 +47,7 @@ namespace LOD_CM_CLI
                     log.LogInformation(dataset.Label);
                     using (var ds = await dataset.LoadHdt())
                     {
-                        await ComputeFpMfpImage(ds, conf.mainDir, conf.precomputationOnly, conf.plantUmlJarPath, conf.LocalGraphvizDotPath);
+                        await ComputeFpMfpImage(ds, conf);
                     }
                 }
                 catch (Exception ex)
@@ -65,8 +65,12 @@ namespace LOD_CM_CLI
             log.LogInformation(sw.Elapsed.ToPrettyFormat());
         }
 
-        public static async Task ComputeFpMfpImage(Dataset dataset, string mainDirectory, bool precomputationOnly, string plantUmlJarPath, string localGraphvizDotPath)
+        public static async Task ComputeFpMfpImage(Dataset dataset, Conf conf)
         {
+            string mainDirectory = conf.mainDir;
+            bool precomputationOnly = conf.precomputationOnly;
+            string plantUmlJarPath = conf.plantUmlJarPath;
+            string localGraphvizDotPath = conf.LocalGraphvizDotPath;
             log.LogInformation("Precomputation...");
             var jsonDatasetPath = Path.Combine(mainDirectory, dataset.Label);
             Directory.CreateDirectory(jsonDatasetPath);
@@ -83,7 +87,7 @@ namespace LOD_CM_CLI
             }
             else
             {
-                dataset.Precomputation();
+                dataset.Precomputation(conf.getPropertiesFromOntology, conf.classesToCompute);
                 log.LogInformation($"Saving after precomputation: {Path.Combine(jsonDatasetPath, "dataset.json")}");
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(Path.Combine(jsonDatasetPath, "dataset.json"), json);

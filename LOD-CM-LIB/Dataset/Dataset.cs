@@ -76,9 +76,23 @@ namespace LOD_CM_CLI.Data
             }
         }
 
+        [JsonIgnore]
+        public IGraph ontologyWikidata
+        {
+            get
+            {
+                if (_ontology == null)
+                {
+                    _ontology = new Graph();
+                    FileLoader.Load(_ontology, Path.Combine(hdtFilePath));
+                }
+                return _ontology;
+            }
+        }
+
         public Dataset() { }
 
-        private Dataset(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider)
+        private Dataset(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider, string label)
         {
             this.hdtFilePath = hdtFilePath;
             if (!File.Exists(hdtFilePath))
@@ -87,6 +101,7 @@ namespace LOD_CM_CLI.Data
             // we just check if an ontology file is provided
             this.IsOntologyAvailable = ontologyFilePath != null &&
                 File.Exists(ontologyFilePath);
+            this.Label = label;
             SetLogger(serviceProvider);
         }
 
@@ -139,9 +154,9 @@ namespace LOD_CM_CLI.Data
                 .Select(x => x.getObject()).ToHashSet();
         }
 
-        public static Dataset Create(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider)
+        public static Dataset Create(string hdtFilePath, string ontologyFilePath, ServiceProvider serviceProvider, string label)
         {
-            return new Dataset(hdtFilePath, ontologyFilePath, serviceProvider);
+            return new Dataset(hdtFilePath, ontologyFilePath, serviceProvider, label);
         }
 
         /// <summary>
@@ -195,7 +210,7 @@ namespace LOD_CM_CLI.Data
         /// </summary>
         /// <value></value>
         public Dictionary<string, Dictionary<string, int>> classesDepths { get; set; }
-        public void Precomputation()
+        public void Precomputation(bool getPropertiesFromOntology, string[] classesToCompute)
         {
             var maxDegreeOfParallelism = 70;
 #if DEBUG
@@ -205,12 +220,15 @@ namespace LOD_CM_CLI.Data
             classesDepths = GetClassesDepth();
             log.LogInformation($"class depth done: {classesDepths.Count}");
             log.LogInformation($"classes...");
-            // superClassesOfClass = new Dictionary<string, HashSet<string>>();
-            var classesTmp = ontology.Triples.Where(x =>
-                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
-                x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
-                .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            // superClassesOfClass = new Dictionary<string, HashSet<string>>();  
+            string[] classesTmp;          
+            if (classesToCompute == null || !classesToCompute.Any())
+                classesTmp = ontology.Triples.Where(x =>
+                    x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                    && (x.Object.ToString().Equals(OntologyHelper.OwlClass) ||
+                    x.Object.ToString().Equals(OntologyHelper.RdfsClass)))
+                    .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            else classesTmp = classesToCompute;
             log.LogInformation($"# of rough classes: {classesTmp.Length}");
             classes = classesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
@@ -227,13 +245,23 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"classes done");
             log.LogInformation($"properties");
             // TODO: add logger everywhere 
-            var propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                .Where(x =>
-                x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
-                x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
-                x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
-                .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            string[] propertiesTmp;
+            log.LogInformation($"getPropertiesFromOntology: {getPropertiesFromOntology}");
+            if (getPropertiesFromOntology)
+            {                
+                propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                    .Where(x =>
+                    x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                    && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
+                    x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
+                    x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
+                    .Select(x => x.Subject.ToString()).Distinct().ToArray();
+            }
+            else
+            {
+                propertiesTmp =  hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                    .WithDegreeOfParallelism(maxDegreeOfParallelism).Select(x => x.getPredicate()).Distinct().ToArray();
+            }
             log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
             properties = propertiesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
                 .Select(x => new InstanceLabel(x, this.propertyForLabel, this))
@@ -241,6 +269,7 @@ namespace LOD_CM_CLI.Data
             log.LogInformation($"# properties: {properties.Count}");
             GetPropertyDomainRangeOrDataType(properties.Values.Select(x => x.Uri).ToList());
             log.LogInformation($"properties done");
+
         }
 
         private Dictionary<string, Dictionary<string, int>> ComputeSuperClasses(Dictionary<string, Dictionary<string, int>> dict)
