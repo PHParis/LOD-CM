@@ -282,20 +282,27 @@ namespace LOD_CM_CLI.Data
             {
                 string[] propertiesTmp;
                 log.LogInformation($"getPropertiesFromOntology: {getPropertiesFromOntology}");
-                if (getPropertiesFromOntology)
-                {
-                    propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                        .Where(x =>
-                        x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
-                        && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
-                        x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
-                        x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
-                        .Select(x => x.Subject.ToString()).Distinct().ToArray();
-                }
+                if (File.Exists(Path.Combine(mainDir, "propertiesTmp2.json")))
+                    propertiesTmp = await SerializationUtils<string[]>
+                        .Deserialize(Path.Combine(mainDir, "propertiesTmp2.json"));
                 else
-                {
-                    propertiesTmp = hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                        .WithDegreeOfParallelism(maxDegreeOfParallelism).Select(x => x.getPredicate()).Distinct().ToArray();
+                {                    
+                    if (getPropertiesFromOntology)
+                    {
+                        propertiesTmp = ontology.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                            .Where(x =>
+                            x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                            && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
+                            x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
+                            x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
+                            .Select(x => x.Subject.ToString()).Distinct().ToArray();
+                    }
+                    else
+                    {
+                        propertiesTmp = hdt.search("", "", "").Select(x => x.getPredicate()).Distinct().ToArray();
+                    }
+                    await SerializationUtils<string[]>
+                        .Serialize(propertiesTmp, Path.Combine(mainDir, "propertiesTmp2.json"));
                 }
                 log.LogInformation($"# of rough properties: {propertiesTmp.Length}");
                 properties = propertiesTmp.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)

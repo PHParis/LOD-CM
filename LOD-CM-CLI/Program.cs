@@ -87,7 +87,7 @@ namespace LOD_CM_CLI
             }
             else
             {
-                dataset.Precomputation(conf.mainDir).Wait();
+                dataset.Precomputation(jsonDatasetPath).Wait();
                 log.LogInformation($"Saving after precomputation: {Path.Combine(jsonDatasetPath, "dataset.json")}");
                 var json = JsonConvert.SerializeObject(dataset);
                 await File.WriteAllTextAsync(Path.Combine(jsonDatasetPath, "dataset.json"), json);
