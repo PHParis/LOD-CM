@@ -43,7 +43,7 @@ namespace LOD_CM_CLI.Data
                 {
                     if (labels.Any(x => x.EndsWith("@en")))
                     {
-                        this.Label = labels.Where(x => x.EndsWith("@en")).FirstOrDefault();
+                        this.Label = labels.Where(x => x.EndsWith("@en")).FirstOrDefault().Replace("@en", string.Empty);
                     }
                     else
                     {
