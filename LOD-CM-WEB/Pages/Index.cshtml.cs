@@ -24,8 +24,10 @@ namespace LOD_CM.Pages
 
         public async Task OnGetAsync()
         {
-            var clientIPAddress = _accessor.HttpContext.Connection.RemoteIpAddress.ToString();
-            await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
+            var clientIPAddress = _accessor.GetRequestIP();//.HttpContext.Connection.RemoteIpAddress.ToString();
+            if (!string.IsNullOrWhiteSpace(clientIPAddress))
+                await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { clientIPAddress });
+                
             ThresholdRanges = Enumerable.Range(50, 51).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
                 Path.Combine(Program.mainDir, "datasets.txt")
