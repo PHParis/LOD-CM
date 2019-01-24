@@ -299,7 +299,14 @@ namespace LOD_CM_CLI.Data
                     }
                     else
                     {
-                        propertiesTmp = hdt.search("", "", "").Select(x => x.getPredicate()).Distinct().ToArray();
+                        propertiesTmp = classes.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                            .SelectMany(cls =>
+                            {
+                                var instancesOfCls = hdt.search("", PropertyType, cls.Value.Uri).Select(x => x.getSubject());
+                                var propertiesOfInstances = instancesOfCls.SelectMany(i => hdt.search(i, "", "").Select(x => x.getPredicate())).Distinct();
+                                return propertiesOfInstances;                                
+                            }).Distinct().ToArray();
+                        // propertiesTmp = hdt.search("", "", "").Select(x => x.getPredicate()).Distinct().ToArray();
                     }
                     await SerializationUtils<string[]>
                         .Serialize(propertiesTmp, Path.Combine(mainDir, "propertiesTmp2.json"));
