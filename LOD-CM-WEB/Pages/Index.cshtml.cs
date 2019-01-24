@@ -26,7 +26,7 @@ namespace LOD_CM.Pages
         {
             var clientIPAddress = _accessor.GetRequestIP();//.HttpContext.Connection.RemoteIpAddress.ToString();
             if (!string.IsNullOrWhiteSpace(clientIPAddress))
-                await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { $"{clientIPAddress} {DateTime.Now}" });
+                await System.IO.File.AppendAllLinesAsync(Path.Combine(Program.mainDir, "ips.txt"), new[] { $"{clientIPAddress} {DateTime.Now.ToString("dd/MM/YYYY HH:mm:ss.f")}" });
 
             ThresholdRanges = Enumerable.Range(50, 51).OrderByDescending(x => x).ToList();
             DatasetNames = await System.IO.File.ReadAllLinesAsync(
