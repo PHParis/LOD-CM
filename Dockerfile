@@ -41,3 +41,4 @@ ENTRYPOINT ["dotnet", "LOD-CM.dll", "/data"]
 # docker run  --rm -v E:/download:/data -d -p 8080:80 --name lod_cm_web lod_cm
 # Pour stopper et supprimer le container
 # docker stop lod_cm_web
+# git pull && docker build -t lod_cm . && docker stop lod_cm_web && docker run  --rm -v /data2/hamdif/doctorants/ph/xp/lod_cm:/data -d -p 84:80 --name lod_cm_web lod_cm
