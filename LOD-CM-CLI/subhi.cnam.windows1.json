@@ -1,0 +1,17 @@
+{
+  "mainDir": "D:\\hdt",
+  "precomputationOnly": false,
+  "plantUmlJarPath": "C:\\dev\\dotnet\\LOD-CM\\LOD-CM-CLI\\examples\\plantuml.jar",
+  "LocalGraphvizDotPath": "C:\\Program Files (x86)\\Graphviz2.38\\bin\\dot.exe",
+  "datasets": [
+    {
+      "PropertyType": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+      "OntologyNameSpace": "http://dbpedia.org/ontology/",
+      "hdtFilePath": "D:\\hdt\\dbpedia\\custom\\dataset.hdt",
+      "ontologyFilePath": "C:\\dev\\dotnet\\LOD-CM\\LOD-CM-CLI\\examples\\dbpedia_2016-10.nt",
+      "IsOntologyAvailable": true,
+      "Label": "DBpedia",
+      "PropertySubClassOf": "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+    }
+  ]
+}

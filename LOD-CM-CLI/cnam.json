@@ -1,5 +1,5 @@
 {
-  "mainDir": "/data2/hamdif/doctorants/ph/xp/lod_cm1",
+  "mainDir": "/data2/hamdif/doctorants/ph/xp/lod_cm",
   "precomputationOnly": false,
   "plantUmlJarPath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/plantuml.jar",
   "LocalGraphvizDotPath": "/usr/bin/dot",
@@ -19,6 +19,7 @@
       "OntologyNameSpace": "http://www.wikidata.org/entity/",
       "hdtFilePath": "/data2/hamdif/doctorants/ph/linkeddatasets/hdt/wikidata/wikidata-20170313-all-BETA.hdt",
       "ontologyFilePath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/wikidata-taxonomy.nt",
+      "propertiesFilePath": "/etudiants/deptinfo/p/pari_p1/dev/dotnet/lod_cm_cli/examples/wikidata-properties.nt",
       "IsOntologyAvailable": true,
       "Label": "Wikidata",
       "propertyForLabel": "http://www.w3.org/2000/01/rdf-schema#label",

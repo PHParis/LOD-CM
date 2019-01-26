@@ -42,6 +42,15 @@ namespace LOD_CM_CLI.Data
         /// <value></value>
         /// <example>With DBpedia its is rdf:type, with Wikidata its is P31</example>
         public string PropertyType { get; set; }
+
+
+        /// <summary>
+        /// Used to search label of an instance within data (not in ontology).
+        /// </summary>
+        /// <value></value>
+        public string PropertyLabel { get; set; }
+
+
         /// <summary>
         /// For Dbpedia: http://dbpedia.org/ontology/
         /// </summary>
@@ -65,6 +74,8 @@ namespace LOD_CM_CLI.Data
         private HDT hdt;
         public string hdtFilePath { get; set; }
         public string ontologyFilePath { get; set; }
+
+        public string propertiesFilePath { get; set; }
         public bool IsOntologyAvailable { get; set; }
 
         public string Label { get; set; }
@@ -90,7 +101,6 @@ namespace LOD_CM_CLI.Data
             }
         }
 
-        [JsonIgnore]
         public IGraph ontologyWikidata
         {
             get
@@ -98,11 +108,12 @@ namespace LOD_CM_CLI.Data
                 if (_ontology == null)
                 {
                     _ontology = new Graph();
-                    FileLoader.Load(_ontology, Path.Combine(hdtFilePath));
+                    FileLoader.Load(_ontology, Path.Combine(propertiesFilePath));
                 }
                 return _ontology;
             }
         }
+
 
         public Dataset() { }
 
@@ -306,8 +317,15 @@ namespace LOD_CM_CLI.Data
                         //        var propertiesOfInstances = instancesOfCls.SelectMany(i => hdt.search(i, "", "").Select(x => x.getPredicate())).Distinct();
                         //        return propertiesOfInstances;                                
                         //    }).Distinct().ToArray();
-                         propertiesTmp = hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
-                            .Select(x => x.getPredicate()).Distinct().ToArray();
+                        // propertiesTmp = hdt.search("", "", "").AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                        //    .Select(x => x.getPredicate()).Distinct().ToArray();
+                        propertiesTmp = ontologyWikidata.Triples.AsParallel().WithExecutionMode(ParallelExecutionMode.ForceParallelism).WithDegreeOfParallelism(maxDegreeOfParallelism)
+                            .Where(x =>
+                            x.Predicate.ToString().Equals(OntologyHelper.PropertyType)
+                            && (x.Object.ToString().Equals(OntologyHelper.OwlDatatypeProperty) ||
+                            x.Object.ToString().Equals(OntologyHelper.OwlObjectProperty) ||
+                            x.Object.ToString().Equals(OntologyHelper.RdfProperty)))
+                            .Select(x => x.Subject.ToString()).Distinct().ToArray();
                     }
                     await SerializationUtils<string[]>
                         .Serialize(propertiesTmp, Path.Combine(mainDir, "propertiesTmp2.json"));
